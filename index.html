@@ -363,8 +363,15 @@ async function changeNameTo(newName, migrate){
   if(!newName || newName === oldName) return false;
   saveName(newName);                                  // 改 localStorage + 内存 MY_NAME
   if(migrate && oldName){
-    const { error:updErr } = await sb.from(TABLE).update({ name: newName }).eq('name', oldName);
-    if(updErr){ toast('数据库历史迁移失败：'+(updErr.message||'')); return false; }
+    // ⚠️ 目标名字已在库里 -> 视为「切换」而不是「改名」，不要迁移！
+    // 否则 update name=新 where name=旧 会和对方“同一天”的记录撞 unique(name,date)，
+    // 报 23505 后身份已切、旧记录又没迁走，界面就错乱（看到的是对方的、自己的“丢了”）
+    if(roster.includes(newName)){
+      toast('「'+newName+'」已有人使用，已切换过去（不合并历史）');
+    }else{
+      const { error:updErr } = await sb.from(TABLE).update({ name: newName }).eq('name', oldName);
+      if(updErr){ toast('数据库历史迁移失败：'+(updErr.message||'')); return false; }
+    }
   }
   const now=new Date(); VIEW_Y=now.getFullYear(); VIEW_M=now.getMonth();
   try{ await loadAll(); await renderAll(); }catch(e){ showRuntimeError(e); }
@@ -612,8 +619,9 @@ drop policy if exists "anon_insert" on public.kaoqin_records;
 create policy "anon_insert" on public.kaoqin_records for insert to anon with check (true);
 drop policy if exists "anon_update" on public.kaoqin_records;
 create policy "anon_update" on public.kaoqin_records for update to anon using (true) with check (true);
-drop policy if exists "anon_delete" on public.kaoqin_records;
-create policy "anon_delete" on public.kaoqin_records for delete to anon using (true);
+-- 小团队内部工具不需要删除功能；这行一旦放开，等于任何人拿 key 都能清空全表，默认关闭
+-- drop policy if exists "anon_delete" on public.kaoqin_records;
+-- create policy "anon_delete" on public.kaoqin_records for delete to anon using (true);
 
 -- 顺带给日期/姓名建索引，记录多了也快（可反复执行，不会报错）
 create index if not exists kaoqin_date_idx      on public.kaoqin_records(date);
@@ -685,6 +693,7 @@ async function boot(){
   const now = new Date();
   VIEW_Y = now.getFullYear(); VIEW_M = now.getMonth();
   if(!MY_NAME){
+    try{ await refreshNameList(); }catch(e){}   // 先拉一次名单，首次选名字时下拉才有建议可选
     showNameModal();
   }else{
     try{ await loadAll(); await renderAll(); }
