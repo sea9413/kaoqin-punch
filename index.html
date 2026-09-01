@@ -686,6 +686,34 @@ $('supWork').onclick = ()=>{ supStatus='work'; updateSupButtons(); };
 $('supRest').onclick = ()=>{ supStatus='rest'; updateSupButtons(); };
 $('supSubmit').onclick = async ()=>{
   if(!supStatus){ toast('先选「上班」还是「休息」'); return; }
+  const date = $('supDate').value;
+  if(!date){ toast('请先选日期'); return; }
+  if(date > todayStr()){ toast('不能补未来的日期'); return; }
+  // 补卡可以是任意历史日期，不能只看当前月份的数据，单独查这天的记录
+  const { data, error } = await sb.from(TABLE).select('*').eq('name', MY_NAME).eq('date', date).limit(1);
+  if(error){ toast('查询失败：'+(error.message||'')); return; }
+  const cur = (data && data[0]) || null;
+  const newLabel = supStatus === 'work' ? '上班' : '休息';
+  if(cur && cur.status === supStatus){
+    // 已经打过一模一样的：只提示，不覆盖
+    await askConfirm({
+      title:'这天已经打过卡了',
+      text:`<b>${esc(date)}</b> 已经记录为 <b>${esc(statusText(cur).label)}</b>，不用重复补卡。`,
+      okText:'知道了', showCancel:false
+    });
+    $('supMask').classList.remove('show');
+    return;
+  }
+  if(cur){
+    // 打过但状态不同：先确认再覆盖
+    const ok = await askConfirm({
+      title:'确认修改这天的打卡？',
+      text:`<b>${esc(date)}</b> 当前是 <b>${esc(statusText(cur).label)}</b>，要改成 <b>${newLabel}</b> 吗？<br/>
+            <span style="color:#999;font-size:12px">确认后覆盖为「${newLabel}」，并标记为补打卡。</span>`,
+      okText:'确认修改', showCancel:true
+    });
+    if(!ok){ $('supMask').classList.remove('show'); return; }
+  }
   await punch(supStatus, true);
   $('supMask').classList.remove('show');
 };
