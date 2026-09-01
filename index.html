@@ -35,6 +35,16 @@
   .card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
   h1{font-size:18px;margin:4px 0 10px;text-align:center}
   h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:6px}
+  /* 月份牌头：标题 + 4 状态图例 同一行 */
+  .card-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .card-hd h2{margin:0;font-size:15px}
+  .legend{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:#666}
+  .legend>span{display:inline-flex;align-items:center;gap:4px}
+  .legend i{display:inline-block;width:14px;height:14px;border-radius:4px;flex-shrink:0}
+  .legend .lg-work{background:#07c160}
+  .legend .lg-rest{background:#fa9d3b}
+  .legend .lg-none{background:#bbb}
+  .legend .lg-sup{background:#9c5cf5}
   h2 .tip{font-size:12px;color:var(--sub);font-weight:400;margin-left:auto}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   select,input[type=date],input[type=text]{
@@ -143,19 +153,21 @@
 
   <!-- 月份牌 -->
   <div class="card">
-    <h2>月份牌 <span class="tip">四种状态一眼看清</span></h2>
+    <div class="card-hd">
+      <h2>月份牌</h2>
+      <div class="legend">
+        <span><i class="lg-work"></i>上班</span>
+        <span><i class="lg-rest"></i>休息</span>
+        <span><i class="lg-none"></i>未打卡</span>
+        <span><i class="lg-sup"></i>补</span>
+      </div>
+    </div>
     <div class="cal-head">
       <button class="ghost" id="calPrev">◀</button>
       <div class="mon" id="calMon"></div>
       <button class="ghost" id="calNext">▶</button>
     </div>
     <div class="cal" id="calGrid"></div>
-    <div class="me" style="margin-top:8px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-      <span><span class="badge b-work">上班</span></span>
-      <span><span class="badge b-rest">休息</span></span>
-      <span><span class="badge b-none">未打卡</span></span>
-      <span><span class="badge b-sup">补</span></span>
-    </div>
   </div>
 
   <!-- 同事列表：今天谁上了谁休了 -->
