@@ -233,6 +233,20 @@
   </div>
 </div>
 
+<!-- 通用确认弹窗（重复打卡提示 / 改打卡确认） -->
+<div class="mask" id="confirmMask">
+  <div class="modal">
+    <h3 id="confirmTitle">确认</h3>
+    <div class="field">
+      <div id="confirmText" style="font-size:14px;color:#555;line-height:1.6"></div>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="confirmCancel" style="flex:1">取消</button>
+      <button class="primary" id="confirmOk" style="flex:1">确定</button>
+    </div>
+  </div>
+</div>
+
 <div class="msg" id="msg"></div>
 
 <script>
@@ -481,6 +495,54 @@ async function punch(status, isSupplement){
 }
 
 /* =========================================================================
+   通用确认弹窗：askConfirm() 返回 Promise<boolean>
+   ========================================================================= */
+let confirmResolve = null;
+function askConfirm(opt){
+  $('confirmTitle').textContent = opt.title || '确认';
+  $('confirmText').innerHTML = opt.text || '';
+  $('confirmOk').textContent = opt.okText || '确定';
+  // showCancel:false 时只留一个按钮（纯提示场景）
+  $('confirmCancel').style.display = opt.showCancel === false ? 'none' : '';
+  $('confirmMask').classList.add('show');
+  return new Promise(res=>{ confirmResolve = res; });
+}
+function closeConfirm(v){
+  $('confirmMask').classList.remove('show');
+  const r = confirmResolve; confirmResolve = null;
+  if(r) r(v);
+}
+
+/* =========================================================================
+   主页打卡：当天已打卡时，点相同的只提示，点不同的先确认再覆盖
+   ========================================================================= */
+async function punchToday(status){
+  if(!MY_NAME){ toast('先选名字'); return; }
+  const cur = myTodayRec;                              // 我今天的记录（没有就是 null）
+  const newLabel = status==='work' ? '上班' : '休息';
+  if(cur && cur.status === status){
+    // 已经打过一模一样的：提示一下就行，不覆盖（避免误触刷 created_at）
+    await askConfirm({
+      title:'今天已经打过卡了',
+      text:`今天（${todayStr()}）已经记录为 <b>${esc(statusText(cur).label)}</b>${cur.is_supplement?'（补打卡）':''}，不用重复打卡。`,
+      okText:'知道了', showCancel:false
+    });
+    return;
+  }
+  if(cur){
+    // 打过但状态不同：改状态要先确认，避免手滑覆盖
+    const ok = await askConfirm({
+      title:'确认修改今天的打卡？',
+      text:`今天（${todayStr()}）当前是 <b>${esc(statusText(cur).label)}</b>，要改成 <b>${newLabel}</b> 吗？<br/>
+            <span style="color:#999;font-size:12px">确认后覆盖为「${newLabel}」。</span>`,
+      okText:'确认修改', showCancel:true
+    });
+    if(!ok) return;
+  }
+  await punch(status, false);                          // 没打过，或已确认，才真正写入
+}
+
+/* =========================================================================
    建表失败时的提示（没有 service_role，只能手动建一次）
    ========================================================================= */
 const SETUP_SQL = `-- 在 Supabase 后台 SQL Editor 里执行一次即可（一次性）
@@ -597,8 +659,10 @@ $('nameSave').onclick = async ()=>{
   catch(e){ showRuntimeError(e); }
 };
 // 主页打卡
-$('btnWork').onclick = ()=>punch('work', false);
-$('btnRest').onclick = ()=>punch('rest', false);
+$('btnWork').onclick = ()=>punchToday('work');
+$('btnRest').onclick = ()=>punchToday('rest');
+$('confirmCancel').onclick = ()=> closeConfirm(false);
+$('confirmOk').onclick = ()=> closeConfirm(true);
 $('btnRefresh').onclick = async ()=>{ try{ await loadAll(); await renderAll(); toast('已刷新'); }catch(e){ showRuntimeError(e);} };
 // 月份牌翻页
 $('calPrev').onclick = async ()=>{ VIEW_M--; if(VIEW_M<0){VIEW_M=11;VIEW_Y--;} await reloadMonth(); };
