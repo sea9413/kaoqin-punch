@@ -126,14 +126,21 @@
   .modal .seg button.sel{opacity:1;outline:2px solid var(--text);outline-offset:2px}  /* 选中：描边 */
   .modal .actions{display:flex;gap:8px;margin-top:6px}
   .hidden{display:none!important}
+  /* 顶部 hero 卡片：左侧文字（标题/日期/名字）+ 右侧「今天我」状态卡 */
+  .card.hero{display:flex;align-items:center;gap:14px}
+  .card.hero .hero-left{flex:1;min-width:0}
+  .card.hero .my-today{margin:0;flex-shrink:0}    /* 在 hero 内不居中、不带上下 margin */
 </style>
 </head>
 <body>
 <div class="wrap" id="app">
-  <div class="card">
-    <h1>📅 团队打卡</h1>
-    <div class="today" id="todayText"></div>
-    <div class="me" id="meBar"></div>
+  <div class="card hero">
+    <div class="hero-left">
+      <h1>📅 团队打卡</h1>
+      <div class="today" id="todayText"></div>
+      <div class="me" id="meBar"></div>
+    </div>
+    <div class="my-today" id="myToday">正在加载今天状态…</div>
   </div>
 
   <div id="errBox" class="err hidden"></div>
@@ -145,7 +152,6 @@
       <button class="work" id="btnWork">✅ 上班</button>
       <button class="rest" id="btnRest">😴 休息</button>
     </div>
-    <div class="my-today" id="myToday">正在加载今天状态…</div>
     <div class="row" style="margin-top:10px">
       <button class="ghost" id="btnSupplement">📝 补打卡</button>
       <button class="ghost" id="btnRefresh">🔄 刷新</button>
