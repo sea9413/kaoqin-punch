@@ -353,12 +353,16 @@ function showSwitchModal(){
   $('switchMask').classList.add('show');
 }
 
-/* 改名公用动作：保存本机身份 + 迁移数据库里 oldName 的所有记录 + 重新拉数据 */
-async function changeNameTo(newName){
+/* 换名字公用动作：改本机身份 +（可选）迁移数据库记录 + 重新拉数据
+   ⚠️ migrate 的语义差别很关键：
+     - 改名（同一个人换名字，比如输错了）：migrate=true，历史记录要跟着人走
+     - 切换（换另一个人来打卡）：migrate=false，绝不能动数据库！
+       否则会把「我自己」的历史打卡全改成对方的名字，两边的考勤数据就全串了 */
+async function changeNameTo(newName, migrate){
   const oldName = MY_NAME;
   if(!newName || newName === oldName) return false;
   saveName(newName);                                  // 改 localStorage + 内存 MY_NAME
-  if(oldName){
+  if(migrate && oldName){
     const { error:updErr } = await sb.from(TABLE).update({ name: newName }).eq('name', oldName);
     if(updErr){ toast('数据库历史迁移失败：'+(updErr.message||'')); return false; }
   }
@@ -697,7 +701,7 @@ $('nameSave').onclick = async ()=>{
   if(!n){ toast('名字不能为空'); return; }
   hideNameModal();
   if(n === MY_NAME) return;                                  // 没改，单纯关弹窗
-  if(await changeNameTo(n)) toast('已改名为「'+n+'」');
+  if(await changeNameTo(n, true)) toast('已改名为「'+n+'」');   // 改名：历史记录跟着人走
 };
 // 切换身份：先验证密码，再选/输新名字
 $('switchCancel').onclick = ()=> $('switchMask').classList.remove('show');
@@ -707,7 +711,7 @@ $('switchOk').onclick = async ()=>{
   if(!n){ toast('请选择或输入名字'); return; }
   $('switchMask').classList.remove('show');
   if(n === MY_NAME) return;                                  // 选的就是自己，不需要迁移
-  if(await changeNameTo(n)) toast('已切换为「'+n+'」');
+  if(await changeNameTo(n, false)) toast('已切换为「'+n+'」');  // 切换：只换本机身份，不碰数据库
 };
 // 主页打卡
 $('btnWork').onclick = ()=>punchToday('work');
