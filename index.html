@@ -68,33 +68,34 @@
   .b-rest{background:var(--orange)}
   .b-none{background:var(--gray);color:#fff}
   .b-sup{background:#9c5cf5}  /* 补打卡标记：紫 */
-  /* 月份牌 */
+  /* 月份牌：minmax(0,1fr) 严格按父容器宽度算，列再挤也撑不爆，手机不溢出 */
   .cal-head{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px}
-  .cal-head .mon{font-size:16px;font-weight:600;min-width:120px;text-align:center}
-  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-  .cal .wd{text-align:center;font-size:12px;color:var(--sub);padding:2px 0}
-  /* 月份牌重做：纯色块加深，去掉格子内状态小字，补标移到底部不挡数字 */
-  .day{aspect-ratio:1/1;border-radius:10px;background:#fafafa;border:1px solid var(--line);
+  .cal-head .mon{font-size:15px;font-weight:600;min-width:100px;text-align:center}
+  .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;width:100%;overflow:hidden}
+  .cal .wd{text-align:center;font-size:11px;color:var(--sub);padding:2px 0;min-width:0}
+  /* 纯色块加深，格子内只显日号，补标移到底部不挡数字 */
+  .day{aspect-ratio:1/1;border-radius:8px;background:#fafafa;border:1px solid var(--line);
        display:flex;align-items:center;justify-content:center;
-       font-size:18px;font-weight:700;position:relative;color:#bbb}
+       font-size:15px;font-weight:700;position:relative;color:#bbb;min-width:0;overflow:hidden}
   .day.empty{background:transparent;border:none}
   .day.none{background:#f5f5f5;color:#bbb}
   .day.work{background:#07c160;color:#fff;border-color:#07c160}
   .day.rest{background:#fa9d3b;color:#fff;border-color:#fa9d3b}
   .day.today{outline:3px solid #576b95;outline-offset:-3px;color:#576b95}
-  .day.today.work{color:#fff}                                   /* 今天自己打卡：白字被深绿块包 */
-  .day.today.rest{color:#fff}                                   /* 今天自己打卡休息 */
-  .day.today.none{background:#fff3e0;color:#fa9d3b;border-color:#fa9d3b}   /* 今天未打卡：橙黄警告色，提醒打卡 */
+  .day.today.work{color:#fff}
+  .day.today.rest{color:#fff}
+  .day.today.none{background:#fff3e0;color:#fa9d3b;border-color:#fa9d3b}    /* 今天未打卡：橙黄警告 */
   .day .sup{position:absolute;bottom:3px;right:3px;font-size:9px;color:#fff;
             background:#9c5cf5;padding:1px 4px;border-radius:4px;line-height:1.2;font-weight:600}
 
-  /* 「今天我」状态卡：放大 + 突出，不再是一个瘦 badge */
+  /* 「今天我」状态卡：上下结构 —— "今天我" 在上、彩色大色块在下，更显眼 */
   .my-today{display:flex;justify-content:center;margin:14px 0 6px}
-  .my-state{display:inline-flex;align-items:center;gap:12px;padding:10px 18px;
-            background:#f5f6f8;border-radius:18px;font-size:15px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-  .my-state-label{color:#888;font-weight:500;font-size:13px}
-  .my-state-badge{padding:6px 18px;border-radius:10px;font-size:15px;
-                  font-weight:700;color:#fff;letter-spacing:.5px}
+  .my-state{display:inline-flex;flex-direction:column;align-items:center;gap:8px;
+            padding:14px 22px;background:#f5f6f8;border-radius:18px;
+            box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .my-state-label{color:#888;font-weight:500;font-size:13px;letter-spacing:1px}
+  .my-state-badge{padding:8px 26px;border-radius:10px;font-size:18px;
+                  font-weight:700;color:#fff;letter-spacing:.5px;min-width:90px;text-align:center}
   .my-state-badge.b-work{background:var(--green)}
   .my-state-badge.b-rest{background:var(--orange)}
   .my-state-badge.b-none{background:var(--gray)}
