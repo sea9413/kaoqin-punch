@@ -7,6 +7,12 @@
 <title>团队打卡 · 小团队考勤</title>
 <!-- supabase-js 从 CDN 引入，浏览器里会挂到 window.supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- 备用 CDN：jsdelivr 挂了就换 unpkg（国内偶发不稳），避免整站变白 -->
+<script>
+  if(!window.supabase){
+    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"><\/script>');
+  }
+</script>
 <style>
   /* ===== 配色（大白话：四种状态各有颜色）===== */
   :root{
@@ -89,6 +95,8 @@
   .modal .field{margin-bottom:12px}
   .modal label{display:block;font-size:13px;color:var(--sub);margin-bottom:4px}
   .modal .seg{display:flex;gap:8px}
+  .modal .seg button{opacity:.4}                                    /* 未选中：淡 */
+  .modal .seg button.sel{opacity:1;outline:2px solid var(--text);outline-offset:2px}  /* 选中：描边 */
   .modal .actions{display:flex;gap:8px;margin-top:6px}
   .hidden{display:none!important}
 </style>
@@ -209,11 +217,27 @@ let VIEW_Y = 0, VIEW_M = 0;   // 月份牌当前看的年/月（0-11）
 let myMonthRecs = {};   // 当前用户本月记录： 'YYYY-MM-DD' -> {status,is_supplement}
 let roster = [];        // 全员名单（去重后的名字）
 let monthAllRecs = [];  // 当前月全员的记录（用于统计 & 同事列表）
+let myTodayRec = null;  // 我今天的记录（始终真实，不跟着月份牌翻页变）
+let supStatus = null;   // 补打卡弹窗里当前选中的状态
 
 /* =========================================================================
    小工具
    ========================================================================= */
 const $ = id => document.getElementById(id);
+
+// HTML 转义：名字是自由输入的，且会渲染给全团队看，必须转义再拼进 innerHTML
+// 否则有人把名字设成 <img src=x onerror=...> 就是存储型 XSS，全队打开页面都中招
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>(
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+// 判断错误是不是"表不存在"，好区分"要建表"和"网络/其它故障"
+function isTableMissing(e){
+  const c = (e && e.code) || '';
+  const m = (e && e.message) || '';
+  return c==='PGRST205' || c==='42P01' || /does not exist|schema cache/i.test(m);
+}
 
 // 本地日期转 YYYY-MM-DD（用本地时区，避免 UTC 差一天）
 function ymd(y, m, d){
@@ -255,13 +279,14 @@ function hideNameModal(){ $('nameMask').classList.remove('show'); }
 // 名字下拉：用表里已有的名字当候选（方便老同事快速选）
 async function refreshNameList(){
   try{
-    const { data, error } = await sb.from(TABLE).select('name');
+    // 上限 2000 行：小团队够用很久，避免表变大后每次都全表扫
+    const { data, error } = await sb.from(TABLE).select('name').limit(2000);
     if(error) throw error;
     const set = new Set((data||[]).map(r=>r.name).filter(Boolean));
     roster = Array.from(set);
   }catch(e){ roster = []; }
   const dl = $('nameList');
-  dl.innerHTML = roster.map(n=>`<option value="${n}"></option>`).join('');
+  dl.innerHTML = roster.map(n=>`<option value="${esc(n)}"></option>`).join('');
 }
 
 /* =========================================================================
@@ -295,19 +320,21 @@ async function loadTodayData(){
   const t = todayStr();
   const { data, error } = await sb.from(TABLE).select('*').eq('date', t);
   if(error) throw error;
-  renderColleagues(data||[]);
+  const recs = data||[];
+  // 顺手取我今天那条：这样"今天我"的状态不受月份牌翻页影响（不额外发请求）
+  myTodayRec = recs.find(r=>r.name===MY_NAME) || null;
+  renderColleagues(recs);
 }
 
 /* =========================================================================
    渲染
    ========================================================================= */
 function renderMe(){
-  $('meBar').innerHTML = `我是：<b>${MY_NAME}</b> · <a href="#" id="switchName">切换</a>`;
+  $('meBar').innerHTML = `我是：<b>${esc(MY_NAME)}</b> · <a href="#" id="switchName">切换</a>`;
   $('switchName').onclick = (e)=>{ e.preventDefault(); showNameModal(true); };
   $('todayText').textContent = `今天是 ${todayStr()}（${['日','一','二','三','四','五','六'][new Date().getDay()]}）`;
-  // 我今天状态
-  const rec = myMonthRecs[todayStr()] || null;
-  const st = statusText(rec);
+  // 用 myTodayRec（今天真实记录），不用 myMonthRecs——后者会跟着月份牌翻页变
+  const st = statusText(myTodayRec);
   $('myToday').innerHTML = `今天我：<span class="badge b-${st.cls}">${st.label}</span>`;
 }
 
@@ -354,7 +381,7 @@ function renderColleagues(todayRecs){
     body.innerHTML = names.map(n=>{
       const st = statusText(map[n]||null);
       const meTag = n===MY_NAME ? ' ·我' : '';
-      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name">${n}${meTag}</td><td><span class="badge b-${st.cls}">${st.label}</span></td></tr>`;
+      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name">${esc(n)}${meTag}</td><td><span class="badge b-${st.cls}">${st.label}</span></td></tr>`;
     }).join('');
   }
   $('colleagueDate').textContent = todayStr();
@@ -363,6 +390,13 @@ function renderColleagues(todayRecs){
 function renderStats(){
   const y=VIEW_Y, m=VIEW_M;
   const total = daysInMonth(y,m);
+  // 只统计"已经过去"的天：未来月份是 0，当月算到今天，历史月份算整月
+  // 否则 9/1 打开会显示"未打卡 29 天"——其中 28 天根本还没到
+  const now = new Date();
+  let elapsed;
+  if(y>now.getFullYear() || (y===now.getFullYear() && m>now.getMonth())) elapsed = 0;
+  else if(y===now.getFullYear() && m===now.getMonth()) elapsed = now.getDate();
+  else elapsed = total;
   // 按人汇总
   const byName = {};
   monthAllRecs.forEach(r=>{
@@ -376,8 +410,8 @@ function renderStats(){
   else{
     body.innerHTML = names.map(n=>{
       const s = byName[n] || {work:0,rest:0,punched:0};
-      const none = total - s.punched;
-      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name">${n}${n===MY_NAME?' ·我':''}</td><td>${s.work}</td><td>${s.rest}</td><td>${none}</td></tr>`;
+      const none = Math.max(0, elapsed - s.punched);
+      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name">${esc(n)}${n===MY_NAME?' ·我':''}</td><td>${s.work}</td><td>${s.rest}</td><td>${none}</td></tr>`;
     }).join('');
   }
 }
@@ -395,11 +429,17 @@ async function punch(status, isSupplement){
   const date = isSupplement ? $('supDate').value : todayStr();
   if(!date){ toast('请先选日期'); return; }
   if(!MY_NAME){ toast('先选名字'); return; }
+  if(date > todayStr()){ toast('不能打未来的日期'); return; }  // YYYY-MM-DD 可直接比大小
   // 补打卡强制只补自己（软限制）
   const payload = { name: MY_NAME, date, status, is_supplement: !!isSupplement };
   // upsert：以 (name,date) 为唯一键覆盖当天，点错再点就改
   const { error } = await sb.from(TABLE).upsert(payload, { onConflict: 'name,date' });
-  if(error){ toast('保存失败：'+error.message); return; }
+  if(error){
+    // 表没了要引导重建；其它错误（网络抖动等）轻量提示，不打断页面
+    if(isTableMissing(error)) showRuntimeError(error);
+    else toast('保存失败：'+(error.message||''));
+    return;
+  }
   toast(isSupplement ? '补卡成功' : '已记录');
   await loadAll();
   await renderAll();
@@ -429,20 +469,48 @@ create policy "anon_insert" on public.kaoqin_records for insert to anon with che
 drop policy if exists "anon_update" on public.kaoqin_records;
 create policy "anon_update" on public.kaoqin_records for update to anon using (true) with check (true);
 drop policy if exists "anon_delete" on public.kaoqin_records;
-create policy "anon_delete" on public.kaoqin_records for delete to anon using (true);`;
+create policy "anon_delete" on public.kaoqin_records for delete to anon using (true);
 
-function showSetupError(detail){
+-- 顺带给日期/姓名建索引，记录多了也快（可反复执行，不会报错）
+create index if not exists kaoqin_date_idx      on public.kaoqin_records(date);
+create index if not exists kaoqin_name_date_idx on public.kaoqin_records(name, date);`;
+
+// 通用错误条：opt.sql 为真时才附建表 SQL + 复制按钮
+function showError(opt){
   const box = $('errBox');
   box.classList.remove('hidden');
+  const sqlBlock = opt.sql
+    ? `<button class="ghost" id="copySql" style="flex:0 0 auto">复制 SQL</button>
+       <pre>${esc(SETUP_SQL)}</pre>`
+    : '';
   box.innerHTML = `
-    <b>⚠️ 还没建表，工具现在用不了。</b><br/>
-    这是一次性动作：打开 Supabase 后台 → SQL Editor，把下面的 SQL 粘进去点 Run，然后刷新本页即可。<br/><br/>
-    <button class="ghost" id="copySql" style="flex:0 0 auto">复制 SQL</button>
-    <pre>${SETUP_SQL}</pre>
-    <div style="font-size:12px;color:var(--sub)">技术细节：${detail||''}</div>`;
-  $('copySql').onclick = ()=>{
-    navigator.clipboard.writeText(SETUP_SQL).then(()=>toast('SQL 已复制'), ()=>toast('复制失败，手动选一下'));
-  };
+    <b>${esc(opt.title)}</b><br/>
+    ${esc(opt.desc)}<br/><br/>
+    ${sqlBlock}
+    <div style="font-size:12px;color:var(--sub)">技术细节：${esc(opt.detail||'')}</div>`;
+  if(opt.sql){
+    $('copySql').onclick = ()=>{
+      navigator.clipboard.writeText(SETUP_SQL).then(()=>toast('SQL 已复制'), ()=>toast('复制失败，手动选一下'));
+    };
+  }
+}
+
+// 区分"要建表"和"网络/其它故障"——原来一律提示建表，网络抖动也会误导人去跑 SQL
+function showRuntimeError(e){
+  const detail = [ (e && e.message) || '', (e && e.code) ? ('[code:'+e.code+']') : '' ].filter(Boolean).join(' ');
+  if(isTableMissing(e)){
+    showError({
+      title:'⚠️ 还没建表，工具现在用不了。',
+      desc:'这是一次性动作：打开 Supabase 后台 → SQL Editor，把下面的 SQL 粘进去点 Run，然后刷新本页即可。',
+      sql:true, detail
+    });
+  }else{
+    showError({
+      title:'⚠️ 连不上数据库，或数据读取出错。',
+      desc:'不是建表问题，多半是网络不通、Supabase 项目暂停，或 RLS 策略没配好。检查网络后刷新本页重试。',
+      sql:false, detail
+    });
+  }
 }
 
 /* =========================================================================
@@ -453,16 +521,21 @@ async function boot(){
   try{
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   }catch(e){
-    showSetupError('supabase-js 加载失败，请检查网络/CDN');
+    showError({ title:'⚠️ 组件没加载成功',
+      desc:'supabase-js 没加载（CDN 被墙或断网）。检查网络后刷新本页重试。',
+      detail:(e && e.message) || String(e) });
     return;
   }
-  // 探一下表在不在：查一条，错就引导建表
-  const probe = await sb.from(TABLE).select('id').limit(1);
-  if(probe.error){
-    // 表不存在（PGRST205 / 42P01）就给建表指引
-    showSetupError((probe.error.message||'') + (probe.error.code?(' [code:'+probe.error.code+']'):''));
+  // 探一下表在不在：查一条，错就给对应指引
+  let probe;
+  try{
+    probe = await sb.from(TABLE).select('id').limit(1);
+  }catch(e){
+    // 网络不通/项目暂停时 await 会直接抛异常。原来这里裸奔，页面会永久卡在"正在加载…"
+    showRuntimeError(e);
     return;
   }
+  if(probe.error){ showRuntimeError(probe.error); return; }
   // 表 OK，进入认人流程
   MY_NAME = loadName();
   const now = new Date();
@@ -471,7 +544,7 @@ async function boot(){
     showNameModal(false);
   }else{
     try{ await loadAll(); await renderAll(); }
-    catch(e){ showSetupError(e.message); }
+    catch(e){ showRuntimeError(e); }
   }
 }
 
@@ -486,21 +559,37 @@ $('nameSave').onclick = async ()=>{
   hideNameModal();
   const now=new Date(); VIEW_Y=now.getFullYear(); VIEW_M=now.getMonth();
   try{ await loadAll(); await renderAll(); }
-  catch(e){ showSetupError(e.message); }
+  catch(e){ showRuntimeError(e); }
 };
 // 主页打卡
 $('btnWork').onclick = ()=>punch('work', false);
 $('btnRest').onclick = ()=>punch('rest', false);
-$('btnRefresh').onclick = async ()=>{ try{ await loadAll(); await renderAll(); toast('已刷新'); }catch(e){ showSetupError(e.message);} };
+$('btnRefresh').onclick = async ()=>{ try{ await loadAll(); await renderAll(); toast('已刷新'); }catch(e){ showRuntimeError(e);} };
 // 月份牌翻页
 $('calPrev').onclick = async ()=>{ VIEW_M--; if(VIEW_M<0){VIEW_M=11;VIEW_Y--;} await reloadMonth(); };
 $('calNext').onclick = async ()=>{ VIEW_M++; if(VIEW_M>11){VIEW_M=0;VIEW_Y++;} await reloadMonth(); };
-async function reloadMonth(){ try{ await loadMonthData(); renderCalendar(); renderStats(); }catch(e){ showSetupError(e.message);} }
-// 补打卡弹窗
-$('btnSupplement').onclick = ()=>{ $('supDate').value = todayStr(); $('supMask').classList.add('show'); };
+async function reloadMonth(){ try{ await loadMonthData(); renderCalendar(); renderStats(); }catch(e){ showRuntimeError(e);} }
+// 补打卡弹窗：选日期 → 选状态（高亮）→ 点「提交补卡」
+// 原来「提交补卡」没绑事件（死按钮），而「上班/休息」一点就直接提交，和设计好的两步流程对不上
+function updateSupButtons(){
+  $('supWork').classList.toggle('sel', supStatus==='work');
+  $('supRest').classList.toggle('sel', supStatus==='rest');
+}
+$('btnSupplement').onclick = ()=>{
+  $('supDate').value = todayStr();
+  $('supDate').max = todayStr();   // 只能补今天及以前，别补到未来去
+  supStatus = null;
+  updateSupButtons();
+  $('supMask').classList.add('show');
+};
 $('supCancel').onclick = ()=> $('supMask').classList.remove('show');
-$('supWork').onclick = ()=> punch('work', true).then(()=>$('supMask').classList.remove('show'));
-$('supRest').onclick = ()=> punch('rest', true).then(()=>$('supMask').classList.remove('show'));
+$('supWork').onclick = ()=>{ supStatus='work'; updateSupButtons(); };
+$('supRest').onclick = ()=>{ supStatus='rest'; updateSupButtons(); };
+$('supSubmit').onclick = async ()=>{
+  if(!supStatus){ toast('先选「上班」还是「休息」'); return; }
+  await punch(supStatus, true);
+  $('supMask').classList.remove('show');
+};
 
 boot();
 </script>
