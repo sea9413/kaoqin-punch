@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<!-- 手机友好：自适应缩放，把刘海屏安全区算进去 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>团队打卡 · 小团队考勤</title>
+<!-- supabase-js 从 CDN 引入，浏览器里会挂到 window.supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  /* ===== 配色（大白话：四种状态各有颜色）===== */
+  :root{
+    --green:#07c160;   /* 上班：绿 */
+    --orange:#fa9d3b;  /* 休息：橙 */
+    --gray:#c8c9cc;    /* 没打卡：灰 */
+    --line:#ebedf0;
+    --text:#333;
+    --sub:#888;
+    --bg:#f7f8fa;
+    --blue:#576b95;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    padding:0 0 60px;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:12px}
+  .card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  h1{font-size:18px;margin:4px 0 10px;text-align:center}
+  h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:6px}
+  h2 .tip{font-size:12px;color:var(--sub);font-weight:400;margin-left:auto}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  select,input[type=date],input[type=text]{
+    font-size:15px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;
+    background:#fff;color:var(--text);min-width:0;flex:1
+  }
+  button{
+    font-size:15px;padding:11px 14px;border:0;border-radius:8px;background:#f2f3f5;
+    color:var(--text);cursor:pointer;flex:1;min-width:88px
+  }
+  button.work{background:var(--green);color:#fff}
+  button.rest{background:var(--orange);color:#fff}
+  button.primary{background:var(--blue);color:#fff}
+  button.ghost{background:#f2f3f5;color:#555;flex:0 0 auto;min-width:0;padding:8px 12px;font-size:13px}
+  button:active{opacity:.85}
+  .me{font-size:13px;color:var(--sub);text-align:center;margin-top:8px}
+  .me a{color:var(--blue);text-decoration:none}
+  .today{font-size:13px;color:var(--sub);text-align:center;margin-bottom:10px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;color:#fff;vertical-align:middle}
+  .b-work{background:var(--green)}
+  .b-rest{background:var(--orange)}
+  .b-none{background:var(--gray);color:#fff}
+  .b-sup{background:#9c5cf5}  /* 补打卡标记：紫 */
+  /* 月份牌 */
+  .cal-head{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px}
+  .cal-head .mon{font-size:16px;font-weight:600;min-width:120px;text-align:center}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .cal .wd{text-align:center;font-size:12px;color:var(--sub);padding:2px 0}
+  .day{aspect-ratio:1/1;border-radius:8px;background:#fafafa;border:1px solid var(--line);
+       display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;position:relative}
+  .day .d{font-size:14px;font-weight:600;line-height:1}
+  .day .s{font-size:11px;margin-top:2px}
+  .day.today{outline:2px solid var(--blue);outline-offset:-2px}
+  .day.work{background:#e8f8ee;border-color:#bfe9cd}
+  .day.rest{background:#fdf1e0;border-color:#f6d8ad}
+  .day.none{background:#f2f3f5;border-color:#e3e4e6;color:var(--sub)}
+  .day .sup{position:absolute;top:2px;right:4px;font-size:9px;color:#9c5cf5;font-weight:700}
+  /* 表格（同事列表 / 统计）*/
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:center}
+  th{color:var(--sub);font-weight:500;font-size:12px}
+  td.name{text-align:left;white-space:nowrap}
+  tr.me-row{background:#f0f6ff}
+  /* 提示条 */
+  .msg{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+       background:rgba(0,0,0,.78);color:#fff;padding:10px 16px;border-radius:8px;
+       font-size:14px;max-width:80%;text-align:center;opacity:0;pointer-events:none;
+       transition:opacity .2s;z-index:99}
+  .msg.show{opacity:1}
+  .err{background:#fff4f4;border:1px solid #ffd0d0;color:#c0392b;border-radius:10px;padding:12px;font-size:13px;margin-bottom:12px}
+  .err pre{background:#2b2b2b;color:#eee;padding:10px;border-radius:8px;overflow:auto;font-size:12px;white-space:pre-wrap;word-break:break-all}
+  .err code{background:#eee;padding:1px 4px;border-radius:4px}
+  /* 弹窗 */
+  .mask{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+  .mask.show{display:flex}
+  .modal{background:#fff;border-radius:14px;padding:18px;width:100%;max-width:340px}
+  .modal h3{margin:0 0 12px;font-size:16px}
+  .modal .field{margin-bottom:12px}
+  .modal label{display:block;font-size:13px;color:var(--sub);margin-bottom:4px}
+  .modal .seg{display:flex;gap:8px}
+  .modal .actions{display:flex;gap:8px;margin-top:6px}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="card">
+    <h1>📅 团队打卡</h1>
+    <div class="today" id="todayText"></div>
+    <div class="me" id="meBar"></div>
+  </div>
+
+  <div id="errBox" class="err hidden"></div>
+
+  <!-- 主页：今天打卡 -->
+  <div class="card" id="punchCard">
+    <h2>今天打一下</h2>
+    <div class="row" style="gap:10px">
+      <button class="work" id="btnWork">✅ 上班</button>
+      <button class="rest" id="btnRest">😴 休息</button>
+    </div>
+    <div class="me" id="myToday" style="margin-top:10px">正在加载今天状态…</div>
+    <div class="row" style="margin-top:10px">
+      <button class="ghost" id="btnSupplement">📝 补打卡</button>
+      <button class="ghost" id="btnRefresh">🔄 刷新</button>
+    </div>
+  </div>
+
+  <!-- 月份牌 -->
+  <div class="card">
+    <h2>月份牌 <span class="tip">四种状态一眼看清</span></h2>
+    <div class="cal-head">
+      <button class="ghost" id="calPrev">◀</button>
+      <div class="mon" id="calMon"></div>
+      <button class="ghost" id="calNext">▶</button>
+    </div>
+    <div class="cal" id="calGrid"></div>
+    <div class="me" style="margin-top:8px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <span><span class="badge b-work">上班</span></span>
+      <span><span class="badge b-rest">休息</span></span>
+      <span><span class="badge b-none">未打卡</span></span>
+      <span><span class="badge b-sup">补</span></span>
+    </div>
+  </div>
+
+  <!-- 同事列表：今天谁上了谁休了 -->
+  <div class="card">
+    <h2>同事今天 <span class="tip" id="colleagueDate"></span></h2>
+    <table id="colleagueTable">
+      <thead><tr><th class="name">姓名</th><th>状态</th></tr></thead>
+      <tbody id="colleagueBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 按月统计 -->
+  <div class="card">
+    <h2>当月统计 <span class="tip">出勤 / 休息 / 未打卡</span></h2>
+    <table id="statTable">
+      <thead><tr><th class="name">姓名</th><th>出勤</th><th>休息</th><th>未打卡</th></tr></thead>
+      <tbody id="statBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 认人弹窗（首次 / 切换）-->
+<div class="mask" id="nameMask">
+  <div class="modal">
+    <h3 id="nameTitle">先选一下你是谁</h3>
+    <div class="field">
+      <label>输入或选择你的名字（本机记住，换手机重选）</label>
+      <input type="text" id="nameInput" list="nameList" placeholder="例如：小王" />
+      <datalist id="nameList"></datalist>
+    </div>
+    <div class="actions">
+      <button class="primary" id="nameSave" style="flex:1">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 补打卡弹窗 -->
+<div class="mask" id="supMask">
+  <div class="modal">
+    <h3>补打卡（只能补自己）</h3>
+    <div class="field">
+      <label>选日期</label>
+      <input type="date" id="supDate" />
+    </div>
+    <div class="field">
+      <label>状态</label>
+      <div class="seg">
+        <button class="work" id="supWork" style="flex:1">上班</button>
+        <button class="rest" id="supRest" style="flex:1">休息</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="supCancel" style="flex:1">取消</button>
+      <button class="primary" id="supSubmit" style="flex:1">提交补卡</button>
+    </div>
+  </div>
+</div>
+
+<div class="msg" id="msg"></div>
+
+<script>
+/* =========================================================================
+   配置区：把下面两个值换成你自己的 Supabase 就行
+   ========================================================================= */
+const SUPABASE_URL  = 'https://gdyiottosunwjothghaz.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_OMPVS-R2K3r9o8vx0VCx1A_SAd4iomg';
+const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
+
+/* =========================================================================
+   全局变量
+   ========================================================================= */
+let sb = null;          // supabase 客户端
+let MY_NAME = '';       // 当前用户名字（localStorage 记着）
+let VIEW_Y = 0, VIEW_M = 0;   // 月份牌当前看的年/月（0-11）
+let myMonthRecs = {};   // 当前用户本月记录： 'YYYY-MM-DD' -> {status,is_supplement}
+let roster = [];        // 全员名单（去重后的名字）
+let monthAllRecs = [];  // 当前月全员的记录（用于统计 & 同事列表）
+
+/* =========================================================================
+   小工具
+   ========================================================================= */
+const $ = id => document.getElementById(id);
+
+// 本地日期转 YYYY-MM-DD（用本地时区，避免 UTC 差一天）
+function ymd(y, m, d){
+  const mm = String(m+1).padStart(2,'0');
+  const dd = String(d).padStart(2,'0');
+  return `${y}-${mm}-${dd}`;
+}
+function todayStr(){ const t=new Date(); return ymd(t.getFullYear(), t.getMonth(), t.getDate()); }
+function daysInMonth(y, m){ return new Date(y, m+1, 0).getDate(); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+// 顶部小提示
+let msgTimer=null;
+function toast(t){
+  const el=$('msg'); el.textContent=t; el.classList.add('show');
+  clearTimeout(msgTimer); msgTimer=setTimeout(()=>el.classList.remove('show'),1800);
+}
+
+// 状态 -> 文案/样式
+function statusText(rec){
+  if(!rec) return {label:'休息(未打卡)', cls:'none'};
+  if(rec.status==='work') return rec.is_supplement ? {label:'上班(补)', cls:'work', sup:true} : {label:'上班', cls:'work'};
+  return rec.is_supplement ? {label:'休息(补)', cls:'rest', sup:true} : {label:'休息', cls:'rest'};
+}
+
+/* =========================================================================
+   认人：首次输入名字，本机记住；切换时重选
+   ========================================================================= */
+function loadName(){ return localStorage.getItem('kq_name') || ''; }
+function saveName(n){ localStorage.setItem('kq_name', n); MY_NAME = n; }
+
+function showNameModal(isSwitch){
+  $('nameTitle').textContent = isSwitch ? '切换身份' : '先选一下你是谁';
+  $('nameInput').value = MY_NAME || '';
+  $('nameMask').classList.add('show');
+}
+function hideNameModal(){ $('nameMask').classList.remove('show'); }
+
+// 名字下拉：用表里已有的名字当候选（方便老同事快速选）
+async function refreshNameList(){
+  try{
+    const { data, error } = await sb.from(TABLE).select('name');
+    if(error) throw error;
+    const set = new Set((data||[]).map(r=>r.name).filter(Boolean));
+    roster = Array.from(set);
+  }catch(e){ roster = []; }
+  const dl = $('nameList');
+  dl.innerHTML = roster.map(n=>`<option value="${n}"></option>`).join('');
+}
+
+/* =========================================================================
+   数据加载
+   ========================================================================= */
+async function loadAll(){
+  await refreshNameList();
+  await loadMonthData();
+  await loadTodayData();
+  renderMe();
+}
+
+// 加载“当前看的月份”里，我自己的记录 + 全员记录
+async function loadMonthData(){
+  const y=VIEW_Y, m=VIEW_M;
+  const first = ymd(y,m,1);
+  const last  = ymd(y,m,daysInMonth(y,m));
+  // 我自己的
+  const { data:mine, error:e1 } = await sb.from(TABLE).select('*').eq('name', MY_NAME).gte('date', first).lte('date', last);
+  if(e1) throw e1;
+  myMonthRecs = {};
+  (mine||[]).forEach(r=>{ myMonthRecs[r.date]=r; });
+  // 全员（统计 & 同事列表用）
+  const { data:all, error:e2 } = await sb.from(TABLE).select('*').gte('date', first).lte('date', last);
+  if(e2) throw e2;
+  monthAllRecs = all||[];
+}
+
+// 今天同事状态：取今天全员记录
+async function loadTodayData(){
+  const t = todayStr();
+  const { data, error } = await sb.from(TABLE).select('*').eq('date', t);
+  if(error) throw error;
+  renderColleagues(data||[]);
+}
+
+/* =========================================================================
+   渲染
+   ========================================================================= */
+function renderMe(){
+  $('meBar').innerHTML = `我是：<b>${MY_NAME}</b> · <a href="#" id="switchName">切换</a>`;
+  $('switchName').onclick = (e)=>{ e.preventDefault(); showNameModal(true); };
+  $('todayText').textContent = `今天是 ${todayStr()}（${['日','一','二','三','四','五','六'][new Date().getDay()]}）`;
+  // 我今天状态
+  const rec = myMonthRecs[todayStr()] || null;
+  const st = statusText(rec);
+  $('myToday').innerHTML = `今天我：<span class="badge b-${st.cls}">${st.label}</span>`;
+}
+
+function renderCalendar(){
+  $('calMon').textContent = `${VIEW_Y}年${VIEW_M+1}月`;
+  const grid = $('calGrid');
+  const wds = ['日','一','二','三','四','五','六'];
+  let html = wds.map(w=>`<div class="wd">${w}</div>`).join('');
+  const firstDay = new Date(VIEW_Y, VIEW_M, 1).getDay();
+  const total = daysInMonth(VIEW_Y, VIEW_M);
+  const tStr = todayStr();
+  // 前置空格
+  for(let i=0;i<firstDay;i++) html += `<div></div>`;
+  for(let d=1; d<=total; d++){
+    const ds = ymd(VIEW_Y, VIEW_M, d);
+    const rec = myMonthRecs[ds] || null;
+    const st = statusText(rec);
+    const isToday = ds===tStr;
+    const cls = ['day'];
+    if(isToday) cls.push('today');
+    // 没打卡且是今天或过去的日子 -> 灰（未打卡）；未来没打卡就留白
+    if(!rec){
+      const dt = new Date(VIEW_Y, VIEW_M, d);
+      const now = new Date(); now.setHours(0,0,0,0);
+      cls.push(dt<=now ? 'none' : '');
+    } else {
+      cls.push(st.cls);
+    }
+    const supTag = (rec && rec.is_supplement) ? '<span class="sup">补</span>' : '';
+    const label = rec ? st.label.replace('(补)','') : (cls.includes('none')?'未打':'');
+    html += `<div class="${cls.join(' ')}">${supTag}<div class="d">${d}</div><div class="s">${label}</div></div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function renderColleagues(todayRecs){
+  // 名单 = 全员 roster；今天有记录的优先排在前面
+  const map = {};
+  (todayRecs||[]).forEach(r=>{ map[r.name]=r; });
+  const names = Array.from(new Set([...Object.keys(map), ...roster]));
+  const body = $('colleagueBody');
+  if(names.length===0){ body.innerHTML = `<tr><td colspan="2" class="name" style="color:var(--sub)">还没有任何打卡记录</td></tr>`; }
+  else{
+    body.innerHTML = names.map(n=>{
+      const st = statusText(map[n]||null);
+      const meTag = n===MY_NAME ? ' ·我' : '';
+      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name">${n}${meTag}</td><td><span class="badge b-${st.cls}">${st.label}</span></td></tr>`;
+    }).join('');
+  }
+  $('colleagueDate').textContent = todayStr();
+}
+
+function renderStats(){
+  const y=VIEW_Y, m=VIEW_M;
+  const total = daysInMonth(y,m);
+  // 按人汇总
+  const byName = {};
+  monthAllRecs.forEach(r=>{
+    if(!byName[r.name]) byName[r.name]={work:0,rest:0,punched:0};
+    byName[r.name].punched++;
+    if(r.status==='work') byName[r.name].work++; else byName[r.name].rest++;
+  });
+  const names = Array.from(new Set([...Object.keys(byName), ...roster]));
+  const body = $('statBody');
+  if(names.length===0){ body.innerHTML = `<tr><td colspan="4" class="name" style="color:var(--sub)">本月暂无数据</td></tr>`; }
+  else{
+    body.innerHTML = names.map(n=>{
+      const s = byName[n] || {work:0,rest:0,punched:0};
+      const none = total - s.punched;
+      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name">${n}${n===MY_NAME?' ·我':''}</td><td>${s.work}</td><td>${s.rest}</td><td>${none}</td></tr>`;
+    }).join('');
+  }
+}
+
+async function renderAll(){
+  renderCalendar();
+  renderStats();
+  renderMe();
+}
+
+/* =========================================================================
+   打卡 / 补打卡（核心：同一天覆盖）
+   ========================================================================= */
+async function punch(status, isSupplement){
+  const date = isSupplement ? $('supDate').value : todayStr();
+  if(!date){ toast('请先选日期'); return; }
+  if(!MY_NAME){ toast('先选名字'); return; }
+  // 补打卡强制只补自己（软限制）
+  const payload = { name: MY_NAME, date, status, is_supplement: !!isSupplement };
+  // upsert：以 (name,date) 为唯一键覆盖当天，点错再点就改
+  const { error } = await sb.from(TABLE).upsert(payload, { onConflict: 'name,date' });
+  if(error){ toast('保存失败：'+error.message); return; }
+  toast(isSupplement ? '补卡成功' : '已记录');
+  await loadAll();
+  await renderAll();
+}
+
+/* =========================================================================
+   建表失败时的提示（没有 service_role，只能手动建一次）
+   ========================================================================= */
+const SETUP_SQL = `-- 在 Supabase 后台 SQL Editor 里执行一次即可（一次性）
+create table if not exists public.kaoqin_records (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  date text not null,                 -- 格式 YYYY-MM-DD
+  status text not null check (status in ('work','rest')),
+  is_supplement boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (name, date)                -- 同一天每人一条，点错覆盖
+);
+
+alter table public.kaoqin_records enable row level security;
+
+-- 小团队内部工具：允许匿名读写（软限制，可接受）
+drop policy if exists "anon_select" on public.kaoqin_records;
+create policy "anon_select" on public.kaoqin_records for select to anon using (true);
+drop policy if exists "anon_insert" on public.kaoqin_records;
+create policy "anon_insert" on public.kaoqin_records for insert to anon with check (true);
+drop policy if exists "anon_update" on public.kaoqin_records;
+create policy "anon_update" on public.kaoqin_records for update to anon using (true) with check (true);
+drop policy if exists "anon_delete" on public.kaoqin_records;
+create policy "anon_delete" on public.kaoqin_records for delete to anon using (true);`;
+
+function showSetupError(detail){
+  const box = $('errBox');
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <b>⚠️ 还没建表，工具现在用不了。</b><br/>
+    这是一次性动作：打开 Supabase 后台 → SQL Editor，把下面的 SQL 粘进去点 Run，然后刷新本页即可。<br/><br/>
+    <button class="ghost" id="copySql" style="flex:0 0 auto">复制 SQL</button>
+    <pre>${SETUP_SQL}</pre>
+    <div style="font-size:12px;color:var(--sub)">技术细节：${detail||''}</div>`;
+  $('copySql').onclick = ()=>{
+    navigator.clipboard.writeText(SETUP_SQL).then(()=>toast('SQL 已复制'), ()=>toast('复制失败，手动选一下'));
+  };
+}
+
+/* =========================================================================
+   启动
+   ========================================================================= */
+async function boot(){
+  // 先创建客户端
+  try{
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }catch(e){
+    showSetupError('supabase-js 加载失败，请检查网络/CDN');
+    return;
+  }
+  // 探一下表在不在：查一条，错就引导建表
+  const probe = await sb.from(TABLE).select('id').limit(1);
+  if(probe.error){
+    // 表不存在（PGRST205 / 42P01）就给建表指引
+    showSetupError((probe.error.message||'') + (probe.error.code?(' [code:'+probe.error.code+']'):''));
+    return;
+  }
+  // 表 OK，进入认人流程
+  MY_NAME = loadName();
+  const now = new Date();
+  VIEW_Y = now.getFullYear(); VIEW_M = now.getMonth();
+  if(!MY_NAME){
+    showNameModal(false);
+  }else{
+    try{ await loadAll(); await renderAll(); }
+    catch(e){ showSetupError(e.message); }
+  }
+}
+
+/* =========================================================================
+   事件绑定
+   ========================================================================= */
+// 认人
+$('nameSave').onclick = async ()=>{
+  const n = $('nameInput').value.trim();
+  if(!n){ toast('名字不能为空'); return; }
+  saveName(n);
+  hideNameModal();
+  const now=new Date(); VIEW_Y=now.getFullYear(); VIEW_M=now.getMonth();
+  try{ await loadAll(); await renderAll(); }
+  catch(e){ showSetupError(e.message); }
+};
+// 主页打卡
+$('btnWork').onclick = ()=>punch('work', false);
+$('btnRest').onclick = ()=>punch('rest', false);
+$('btnRefresh').onclick = async ()=>{ try{ await loadAll(); await renderAll(); toast('已刷新'); }catch(e){ showSetupError(e.message);} };
+// 月份牌翻页
+$('calPrev').onclick = async ()=>{ VIEW_M--; if(VIEW_M<0){VIEW_M=11;VIEW_Y--;} await reloadMonth(); };
+$('calNext').onclick = async ()=>{ VIEW_M++; if(VIEW_M>11){VIEW_M=0;VIEW_Y++;} await reloadMonth(); };
+async function reloadMonth(){ try{ await loadMonthData(); renderCalendar(); renderStats(); }catch(e){ showSetupError(e.message);} }
+// 补打卡弹窗
+$('btnSupplement').onclick = ()=>{ $('supDate').value = todayStr(); $('supMask').classList.add('show'); };
+$('supCancel').onclick = ()=> $('supMask').classList.remove('show');
+$('supWork').onclick = ()=> punch('work', true).then(()=>$('supMask').classList.remove('show'));
+$('supRest').onclick = ()=> punch('rest', true).then(()=>$('supMask').classList.remove('show'));
+
+boot();
+</script>
+</body>
+</html>
