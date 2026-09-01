@@ -318,8 +318,9 @@ function statusText(rec){
 function loadName(){ return localStorage.getItem('kq_name') || ''; }
 function saveName(n){ localStorage.setItem('kq_name', n); MY_NAME = n; }
 
-function showNameModal(isSwitch){
-  $('nameTitle').textContent = isSwitch ? '切换身份' : '先选一下你是谁';
+function showNameModal(mode){
+  // mode='edit' -> 修改你的名字；其它（默认/undefined）-> 首次选名字
+  $('nameTitle').textContent = mode === 'edit' ? '修改你的名字' : '先选一下你是谁';
   $('nameInput').value = MY_NAME || '';
   $('nameMask').classList.add('show');
 }
@@ -379,8 +380,8 @@ async function loadTodayData(){
    渲染
    ========================================================================= */
 function renderMe(){
-  $('meBar').innerHTML = `我是：<b>${esc(MY_NAME)}</b> · <a href="#" id="switchName">切换</a>`;
-  $('switchName').onclick = (e)=>{ e.preventDefault(); showNameModal(true); };
+  $('meBar').innerHTML = `我是：<b>${esc(MY_NAME)}</b> · <a href="#" id="editName">修改</a>`;
+  $('editName').onclick = (e)=>{ e.preventDefault(); showNameModal('edit'); };
   $('todayText').textContent = `今天是 ${todayStr()}（${['日','一','二','三','四','五','六'][new Date().getDay()]}）`;
   // 用 myTodayRec（今天真实记录），不用 myMonthRecs——后者会跟着月份牌翻页变
   const st = statusText(myTodayRec);
@@ -638,7 +639,7 @@ async function boot(){
   const now = new Date();
   VIEW_Y = now.getFullYear(); VIEW_M = now.getMonth();
   if(!MY_NAME){
-    showNameModal(false);
+    showNameModal();
   }else{
     try{ await loadAll(); await renderAll(); }
     catch(e){ showRuntimeError(e); }
@@ -652,8 +653,17 @@ async function boot(){
 $('nameSave').onclick = async ()=>{
   const n = $('nameInput').value.trim();
   if(!n){ toast('名字不能为空'); return; }
-  saveName(n);
+  const oldName = MY_NAME;
+  if(n === oldName){ hideNameModal(); return; }                       // 没改，单纯关弹窗
+  saveName(n);                                                         // 改本机名字（写 localStorage + MY_NAME）
   hideNameModal();
+  // 改名：把数据库里所有署名 oldName 的打卡记录迁到新名字名下，
+  // 否则自己的历史打卡就看不到了
+  if(oldName){
+    const { error:updErr } = await sb.from(TABLE).update({ name: n }).eq('name', oldName);
+    if(updErr) toast('名字改了，但数据库里历史打卡没迁过去：'+(updErr.message||''));
+    else toast('已改名为「'+n+'」');
+  }
   const now=new Date(); VIEW_Y=now.getFullYear(); VIEW_M=now.getMonth();
   try{ await loadAll(); await renderAll(); }
   catch(e){ showRuntimeError(e); }
