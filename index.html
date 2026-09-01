@@ -211,6 +211,25 @@
   </div>
 </div>
 
+<!-- 切换身份弹窗（密码 + 选/输新名字） -->
+<div class="mask" id="switchMask">
+  <div class="modal">
+    <h3>切换身份</h3>
+    <div class="field">
+      <label>切换密码（默认 6666，防止同事之间随便切）</label>
+      <input type="password" id="switchPwd" placeholder="请输入切换密码" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>选择或输入名字（可从团队已有名字里挑）</label>
+      <input type="text" id="switchNameInput" list="nameList" placeholder="例如：小王" />
+    </div>
+    <div class="actions">
+      <button class="ghost" id="switchCancel" style="flex:1">取消</button>
+      <button class="primary" id="switchOk" style="flex:1">切换</button>
+    </div>
+  </div>
+</div>
+
 <!-- 补打卡弹窗 -->
 <div class="mask" id="supMask">
   <div class="modal">
@@ -256,6 +275,7 @@
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
+const SWITCH_PASSWORD = '6666';   // 切换身份密码：挡住随便切换的人，正规版建议放配置或用真实鉴权
 
 /* =========================================================================
    全局变量
@@ -326,6 +346,27 @@ function showNameModal(mode){
 }
 function hideNameModal(){ $('nameMask').classList.remove('show'); }
 
+/* 切换身份弹窗：先要密码，再选/输新名字 */
+function showSwitchModal(){
+  $('switchPwd').value = '';
+  $('switchNameInput').value = MY_NAME || '';
+  $('switchMask').classList.add('show');
+}
+
+/* 改名公用动作：保存本机身份 + 迁移数据库里 oldName 的所有记录 + 重新拉数据 */
+async function changeNameTo(newName){
+  const oldName = MY_NAME;
+  if(!newName || newName === oldName) return false;
+  saveName(newName);                                  // 改 localStorage + 内存 MY_NAME
+  if(oldName){
+    const { error:updErr } = await sb.from(TABLE).update({ name: newName }).eq('name', oldName);
+    if(updErr){ toast('数据库历史迁移失败：'+(updErr.message||'')); return false; }
+  }
+  const now=new Date(); VIEW_Y=now.getFullYear(); VIEW_M=now.getMonth();
+  try{ await loadAll(); await renderAll(); }catch(e){ showRuntimeError(e); }
+  return true;
+}
+
 // 名字下拉：用表里已有的名字当候选（方便老同事快速选）
 async function refreshNameList(){
   try{
@@ -380,8 +421,9 @@ async function loadTodayData(){
    渲染
    ========================================================================= */
 function renderMe(){
-  $('meBar').innerHTML = `我是：<b>${esc(MY_NAME)}</b> · <a href="#" id="editName">修改</a>`;
+  $('meBar').innerHTML = `我是：<b>${esc(MY_NAME)}</b> · <a href="#" id="editName">修改</a> · <a href="#" id="switchBtn">切换</a>`;
   $('editName').onclick = (e)=>{ e.preventDefault(); showNameModal('edit'); };
+  $('switchBtn').onclick = (e)=>{ e.preventDefault(); showSwitchModal(); };
   $('todayText').textContent = `今天是 ${todayStr()}（${['日','一','二','三','四','五','六'][new Date().getDay()]}）`;
   // 用 myTodayRec（今天真实记录），不用 myMonthRecs——后者会跟着月份牌翻页变
   const st = statusText(myTodayRec);
@@ -653,20 +695,19 @@ async function boot(){
 $('nameSave').onclick = async ()=>{
   const n = $('nameInput').value.trim();
   if(!n){ toast('名字不能为空'); return; }
-  const oldName = MY_NAME;
-  if(n === oldName){ hideNameModal(); return; }                       // 没改，单纯关弹窗
-  saveName(n);                                                         // 改本机名字（写 localStorage + MY_NAME）
   hideNameModal();
-  // 改名：把数据库里所有署名 oldName 的打卡记录迁到新名字名下，
-  // 否则自己的历史打卡就看不到了
-  if(oldName){
-    const { error:updErr } = await sb.from(TABLE).update({ name: n }).eq('name', oldName);
-    if(updErr) toast('名字改了，但数据库里历史打卡没迁过去：'+(updErr.message||''));
-    else toast('已改名为「'+n+'」');
-  }
-  const now=new Date(); VIEW_Y=now.getFullYear(); VIEW_M=now.getMonth();
-  try{ await loadAll(); await renderAll(); }
-  catch(e){ showRuntimeError(e); }
+  if(n === MY_NAME) return;                                  // 没改，单纯关弹窗
+  if(await changeNameTo(n)) toast('已改名为「'+n+'」');
+};
+// 切换身份：先验证密码，再选/输新名字
+$('switchCancel').onclick = ()=> $('switchMask').classList.remove('show');
+$('switchOk').onclick = async ()=>{
+  if($('switchPwd').value !== SWITCH_PASSWORD){ toast('切换密码错误'); return; }
+  const n = $('switchNameInput').value.trim();
+  if(!n){ toast('请选择或输入名字'); return; }
+  $('switchMask').classList.remove('show');
+  if(n === MY_NAME) return;                                  // 选的就是自己，不需要迁移
+  if(await changeNameTo(n)) toast('已切换为「'+n+'」');
 };
 // 主页打卡
 $('btnWork').onclick = ()=>punchToday('work');
