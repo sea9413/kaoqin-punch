@@ -210,13 +210,15 @@
       <button class="work" id="btnWork">✅ 上班</button>
       <button class="rest" id="btnRest">😴 休息</button>
     </div>
-    <div class="row" style="margin-top:10px">
-      <button class="ghost" id="btnSupplement">📝 补打卡</button>
-      <button class="ghost" id="btnAch">🏅 我的成就</button>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <button class="ghost" id="btnRank">📊 趣味榜</button>
-      <button class="ghost" id="btnRefresh">🔄 刷新</button>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <div class="row" style="flex:0 1 auto;gap:8px;flex-wrap:wrap">
+        <button class="ghost" id="btnSupplement">📝 补打卡</button>
+        <button class="ghost" id="btnRefresh">🔄 刷新</button>
+      </div>
+      <div class="row" style="flex:0 1 auto;gap:8px;flex-wrap:wrap">
+        <button class="ghost" id="btnAch">🏅 我的成就</button>
+        <button class="ghost" id="btnRank">📊 趣味榜</button>
+      </div>
     </div>
   </div>
 
@@ -384,7 +386,7 @@
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.1.6';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.7';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
