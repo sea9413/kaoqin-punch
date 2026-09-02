@@ -384,7 +384,7 @@
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.1.5';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.6';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
@@ -868,20 +868,25 @@ function calcAchStats(recs){
   st.maxStreak = max;
   st.curStreak = streak;
 
-  // 3) 首月满勤：入职日到该月月底的每个工作日都有打卡（当前月只算到今天）
+  // 3) 首月满勤：仅对"已结束"的自然月判定。当前月一律不判
+  //    避免入职当天/月中几天就误判「满勤」（同样的坑月度满勤 v1.1.1 修过）
   const fd = new Date(dates[0]+'T00:00:00');
   const fy = fd.getFullYear(), fm = fd.getMonth();
   const now = new Date();
   const isCur = (fy === now.getFullYear() && fm === now.getMonth());
-  const fEnd = isCur ? now.getDate() : daysInMonth(fy, fm);
-  let fFull = true, fCnt = 0;
-  for(let dd = fd.getDate(); dd <= fEnd; dd++){
-    const ds = ymd(fy, fm, dd);
-    if(!isWorkday(ds)) continue;
-    fCnt++;
-    if(!byDate[ds]){ fFull = false; break; }
+  if(isCur){
+    st.firstMonthFull = false;
+  }else{
+    let fFull = true, fCnt = 0;
+    const fEnd = daysInMonth(fy, fm);
+    for(let dd = fd.getDate(); dd <= fEnd; dd++){
+      const ds = ymd(fy, fm, dd);
+      if(!isWorkday(ds)) continue;
+      fCnt++;
+      if(!byDate[ds]){ fFull = false; break; }
+    }
+    st.firstMonthFull = fFull && fCnt > 0;
   }
-  st.firstMonthFull = fFull && fCnt > 0;
 
   // 4) 当月统计：只算到今天，未来工作日不算缺勤（否则满勤永远拿不到）
   const y = now.getFullYear(), m = now.getMonth();
