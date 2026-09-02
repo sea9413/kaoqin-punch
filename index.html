@@ -384,7 +384,7 @@
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.1.4';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.5';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
@@ -1205,6 +1205,10 @@ async function punch(status, isSupplement){
    ========================================================================= */
 let confirmResolve = null;
 function askConfirm(opt){
+  // 把确认弹窗挪到 body 最后：即使 z-index 相同，DOM 靠后的也会盖在前面那些之上。
+  // 它原本排在成就墙/榜单之前，不挪会被压在下面，表现就是「点了没反应」。
+  const cm = $('confirmMask');
+  if(cm && cm.parentNode) cm.parentNode.appendChild(cm);
   $('confirmTitle').textContent = opt.title || '确认';
   $('confirmText').innerHTML = opt.text || '';
   $('confirmOk').textContent = opt.okText || '确定';
