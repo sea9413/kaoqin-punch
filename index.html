@@ -105,6 +105,8 @@
   th,td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:center}
   th{color:var(--sub);font-weight:500;font-size:12px}
   td.name{text-align:left;white-space:nowrap}
+  td.name .name-link{color:var(--blue);text-decoration:none}
+  td.name .name-link:active{opacity:.7}
   tr.me-row{background:#f0f6ff}
   /* 提示条 */
   .msg{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
@@ -380,13 +382,32 @@
   </div>
 </div>
 
+<!-- 同事档案弹窗：聚合视图（连续/累计/称号），不展示具体日期 -->
+<div class="mask" id="profileMask">
+  <div class="modal">
+    <h3 id="profileName">同事档案</h3>
+    <div class="note">📌 本视图只展示聚合统计（累计出勤、连续天数、对应称号），不展示具体哪天打了什么——保护同事隐私，请勿传播他人考勤明细。</div>
+    <div class="stat-grid" style="margin-bottom:10px">
+      <div class="stat-box"><div class="v" id="pfTotal">…</div><div class="k">累计出勤</div></div>
+      <div class="stat-box"><div class="v" id="pfCur">…</div><div class="k">当前连续</div></div>
+      <div class="stat-box"><div class="v" id="pfMax">…</div><div class="k">历史最高</div></div>
+    </div>
+    <div id="pfMonth" style="font-size:13px;color:var(--sub);margin-bottom:6px"></div>
+    <div id="pfTitle" style="font-size:14px;color:var(--blue);margin-bottom:6px"></div>
+    <div id="pfFirst" style="font-size:12px;color:var(--sub)"></div>
+    <div class="actions" style="margin-top:12px">
+      <button class="primary" id="pfClose" style="flex:1">关闭</button>
+    </div>
+  </div>
+</div>
+
 <div class="msg" id="msg"></div>
 
 <script>
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.1.7';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.8';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
@@ -746,7 +767,7 @@ function renderColleagues(todayRecs){
     body.innerHTML = names.map(n=>{
       const st = statusText(map[n]||null);
       const meTag = n===MY_NAME ? ' ·我' : '';
-      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name">${esc(n)}${meTag}</td><td><span class="badge b-${st.cls}">${st.label}</span></td></tr>`;
+      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name"><a href="#" class="name-link" data-name="${esc(n)}">${esc(n)}</a>${meTag}</td><td><span class="badge b-${st.cls}">${st.label}</span></td></tr>`;
     }).join('');
   }
   $('colleagueDate').textContent = todayStr();
@@ -776,7 +797,7 @@ function renderStats(){
     body.innerHTML = names.map(n=>{
       const s = byName[n] || {work:0,rest:0,punched:0};
       const none = Math.max(0, elapsed - s.punched);
-      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name">${esc(n)}${n===MY_NAME?' ·我':''}</td><td>${s.work}</td><td>${s.rest}</td><td>${none}</td></tr>`;
+      return `<tr class="${n===MY_NAME?'me-row':''}"><td class="name"><a href="#" class="name-link" data-name="${esc(n)}">${esc(n)}</a>${n===MY_NAME?' ·我':''}</td><td>${s.work}</td><td>${s.rest}</td><td>${none}</td></tr>`;
     }).join('');
   }
 }
@@ -1177,6 +1198,39 @@ function renderRank(){
     </div>`).join('');
 }
 
+/* ---------- 同事档案（聚合视图，保护隐私） ---------- */
+async function loadUserFullRecs(name){
+  const { data, error } = await sb.from(TABLE)
+    .select('date,status,is_supplement,created_at')
+    .eq('name', name).limit(5000);
+  if(error) throw error;
+  return data || [];
+}
+async function showProfile(name){
+  $('profileName').textContent = name + ' · 考勤概览';
+  $('pfTotal').textContent = '…';
+  $('pfCur').textContent   = '…';
+  $('pfMax').textContent   = '…';
+  $('pfMonth').textContent = '加载中…';
+  $('pfTitle').textContent = '';
+  $('pfFirst').textContent = '';
+  $('profileMask').classList.add('show');
+  try{
+    const recs = await loadUserFullRecs(name);
+    const st = calcAchStats(recs);
+    $('pfTotal').textContent = st.totalDays;
+    $('pfCur').textContent   = st.curStreak;
+    $('pfMax').textContent   = st.maxStreak;
+    $('pfMonth').textContent =
+      `当月：出勤 ${st.monthWorkdays} 天 · 早到 ${st.monthEarly} 次 · 收官 ${st.monthLate} 次`;
+    $('pfTitle').textContent = streakTitle(st.maxStreak)
+      ? `最高称号：${streakTitle(st.maxStreak)}` : '最高称号：尚无（满 7 天解锁「一周笃行」）';
+    $('pfFirst').textContent = recs.length ? `首签：${recs.map(r=>r.date).sort()[0]}` : '尚无打卡记录';
+  }catch(e){
+    $('pfMonth').textContent = '加载失败：' + ((e && e.message) || '');
+  }
+}
+
 /* =========================================================================
    打卡 / 补打卡（核心：同一天覆盖）
    ========================================================================= */
@@ -1467,6 +1521,15 @@ $('btnJoinLb').onclick = async ()=>{
   rankJoinNames = await loadJoinNames();
   renderRank();
 };
+/* ===== 同事档案（点击姓名查看）===== */
+$('pfClose').onclick = ()=> $('profileMask').classList.remove('show');
+// 事件委托：表格里所有 .name-link 都能点（同事今天 + 当月统计）
+document.addEventListener('click', (e)=>{
+  const a = e.target.closest('.name-link');
+  if(!a || !a.dataset.name) return;
+  e.preventDefault();
+  showProfile(a.dataset.name);
+});
 // 月份牌翻页
 $('calPrev').onclick = async ()=>{ VIEW_M--; if(VIEW_M<0){VIEW_M=11;VIEW_Y--;} await reloadMonth(); };
 $('calNext').onclick = async ()=>{ VIEW_M++; if(VIEW_M>11){VIEW_M=0;VIEW_Y++;} await reloadMonth(); };
