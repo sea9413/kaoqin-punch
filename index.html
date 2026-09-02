@@ -378,7 +378,7 @@
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.1.1';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.2';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
@@ -674,9 +674,21 @@ async function loadTodayData(){
    渲染
    ========================================================================= */
 function renderMe(){
-  $('meBar').innerHTML = `我是：<b>${esc(MY_NAME)}</b> · <a href="#" id="editName">修改</a> · <a href="#" id="switchBtn">切换</a>`;
+  $('meBar').innerHTML = `我是：<b>${esc(MY_NAME)}</b> · <a href="#" id="editName">修改</a> · <a href="#" id="switchBtn">切换</a> · <a href="#" id="resetLocal">重置本机</a>`;
   $('editName').onclick = (e)=>{ e.preventDefault(); showNameModal('edit'); };
   $('switchBtn').onclick = (e)=>{ e.preventDefault(); showSwitchModal(); };
+  $('resetLocal').onclick = async (e)=>{
+    e.preventDefault();
+    const ok = await askConfirm({
+      title:'重置本机数据？',
+      text:`清除<b>本机记住的名字</b>和<b>成就通知记录</b>，重置后需要重新选择你是谁。<br/>
+            <span style="color:#999;font-size:12px">只影响这台设备，服务器上大家的打卡数据不受影响。</span>`,
+      okText:'确认重置', showCancel:true
+    });
+    if(!ok) return;
+    ['kq_name','kq_ach_notified','kq_style'].forEach(k=>localStorage.removeItem(k));
+    location.reload();
+  };
   $('todayText').textContent = `今天是 ${todayStr()}（${['日','一','二','三','四','五','六'][new Date().getDay()]}）`;
   // 用 myTodayRec（今天真实记录），不用 myMonthRecs——后者会跟着月份牌翻页变
   const st = statusText(myTodayRec);
