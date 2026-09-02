@@ -88,6 +88,10 @@
   .day.today.none{background:#fff3e0;color:#fa9d3b;border-color:#fa9d3b}    /* 今天未打卡：橙黄警告 */
   .day .sup{position:absolute;bottom:3px;right:3px;font-size:9px;color:#fff;
             background:#9c5cf5;padding:1px 4px;border-radius:4px;line-height:1.2;font-weight:600}
+  /* 档案弹窗日历：日期可点选看明细 */
+  #pfCal .pfd{cursor:pointer}
+  #pfCal .pfd.sel{outline:3px solid #576b95;outline-offset:-3px}
+  #profileMask .modal{max-height:88vh;overflow-y:auto;overscroll-behavior:contain}
 
   /* 「今天我」状态卡：上下结构 —— "今天我" 在上、彩色大色块在下，更显眼 */
   .my-today{display:flex;justify-content:center;margin:14px 0 6px}
@@ -382,20 +386,29 @@
   </div>
 </div>
 
-<!-- 同事档案弹窗：聚合视图（连续/累计/称号），不展示具体日期 -->
+<!-- 同事档案弹窗：日历明细视图（用户现实需要：查看某人哪天打卡/具体时刻） -->
 <div class="mask" id="profileMask">
   <div class="modal">
-    <h3 id="profileName">同事档案</h3>
-    <div class="note">📌 本视图只展示聚合统计（累计出勤、连续天数、对应称号），不展示具体哪天打了什么——保护同事隐私，请勿传播他人考勤明细。</div>
+    <h3 id="profileName">考勤档案</h3>
     <div class="stat-grid" style="margin-bottom:10px">
       <div class="stat-box"><div class="v" id="pfTotal">…</div><div class="k">累计出勤</div></div>
       <div class="stat-box"><div class="v" id="pfCur">…</div><div class="k">当前连续</div></div>
       <div class="stat-box"><div class="v" id="pfMax">…</div><div class="k">历史最高</div></div>
     </div>
-    <div id="pfMonth" style="font-size:13px;color:var(--sub);margin-bottom:6px"></div>
-    <div id="pfTitle" style="font-size:14px;color:var(--blue);margin-bottom:6px"></div>
-    <div id="pfFirst" style="font-size:12px;color:var(--sub)"></div>
-    <div class="actions" style="margin-top:12px">
+    <div class="cal-head" style="margin-bottom:6px">
+      <button class="ghost" id="pfPrev">◀</button>
+      <div class="mon" id="pfMon"></div>
+      <button class="ghost" id="pfNext">▶</button>
+    </div>
+    <div class="legend" style="margin-bottom:6px">
+      <span><i class="lg-work"></i>上班</span>
+      <span><i class="lg-rest"></i>休息</span>
+      <span><i class="lg-none"></i>未打卡</span>
+      <span><i class="lg-sup"></i>补</span>
+    </div>
+    <div class="cal" id="pfCal"></div>
+    <div id="pfDay" style="margin-top:8px;font-size:14px;text-align:center;min-height:2.4em"></div>
+    <div class="actions" style="margin-top:10px">
       <button class="primary" id="pfClose" style="flex:1">关闭</button>
     </div>
   </div>
@@ -407,7 +420,7 @@
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.1.8';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.9';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
@@ -1198,7 +1211,9 @@ function renderRank(){
     </div>`).join('');
 }
 
-/* ---------- 同事档案（聚合视图，保护隐私） ---------- */
+/* ---------- 同事档案（日历明细：哪天打了哪天没打 + 具体时刻） ----------
+   注：原 PRD「禁止查看他人考勤详情」条款于 2026-09-02 应现实需要解除。
+   本视图供班组负责人核看成员考勤，请仅用于工作管理，勿外传。 */
 async function loadUserFullRecs(name){
   const { data, error } = await sb.from(TABLE)
     .select('date,status,is_supplement,created_at')
@@ -1206,28 +1221,71 @@ async function loadUserFullRecs(name){
   if(error) throw error;
   return data || [];
 }
+let prof = null;   // { name, byDate:{'YYYY-MM-DD':rec}, st, y, m }
+function renderProfileCal(){
+  if(!prof) return;
+  const grid = $('pfCal');
+  const wds = ['日','一','二','三','四','五','六'];
+  let html = wds.map(w=>`<div class="wd">${w}</div>`).join('');
+  const first = new Date(prof.y, prof.m, 1).getDay();
+  const total = daysInMonth(prof.y, prof.m);
+  const nowT = new Date(); nowT.setHours(0,0,0,0);
+  for(let i=0;i<first;i++) html += '<div class="day empty"></div>';
+  for(let d=1; d<=total; d++){
+    const ds = ymd(prof.y, prof.m, d);
+    const rec = prof.byDate[ds] || null;
+    const cls = ['day','pfd'];
+    if(rec) cls.push(rec.status);                       // work / rest 上色
+    else{ const dt = new Date(prof.y, prof.m, d); if(dt<=nowT) cls.push('none'); }
+    const supTag = (rec && rec.is_supplement) ? '<span class="sup">补</span>' : '';
+    html += `<div class="${cls.join(' ')}" data-ds="${ds}">${supTag}<span class="d">${d}</span></div>`;
+  }
+  grid.innerHTML = html;
+}
+function selectProfDay(ds){
+  if(!prof || !ds) return;
+  const rec = prof.byDate[ds];
+  const [y,m,d] = ds.split('-').map(Number);
+  const wd = ['日','一','二','三','四','五','六'][new Date(y, m-1, d).getDay()];
+  const hm = punchHM(rec);
+  let box;
+  if(rec && rec.status==='work'){
+    box = `✅ <b>${m}月${d}日 · 周${wd} · 上班</b><br><span style="color:var(--sub);font-size:12px">打卡时刻 ${hm||'—'}${rec.is_supplement?' · ↩ 补卡':''}</span>`;
+  }else if(rec && rec.status==='rest'){
+    box = `😴 <b>${m}月${d}日 · 周${wd} · 休息</b><br><span style="color:var(--sub);font-size:12px">${rec.is_supplement?'↩ 补卡':'本人报备休息'}</span>`;
+  }else{
+    const dt = new Date(y, m-1, d), nowT = new Date(); nowT.setHours(0,0,0,0);
+    box = dt > nowT
+      ? `<span style="color:#bbb">${m}月${d}日 · 周${wd} · 尚未到</span>`
+      : `${m}月${d}日 · 周${wd} · <b style="color:#fa9d3b">未打卡</b>`;
+  }
+  $('pfDay').innerHTML = box;
+  document.querySelectorAll('#pfCal .pfd').forEach(el=> el.classList.toggle('sel', el.dataset.ds===ds));
+}
 async function showProfile(name){
-  $('profileName').textContent = name + ' · 考勤概览';
+  const now = new Date();
+  prof = { name, byDate:{}, st:null, y:now.getFullYear(), m:now.getMonth() };
+  $('profileName').textContent = name + ' · 考勤档案';
   $('pfTotal').textContent = '…';
   $('pfCur').textContent   = '…';
   $('pfMax').textContent   = '…';
-  $('pfMonth').textContent = '加载中…';
-  $('pfTitle').textContent = '';
-  $('pfFirst').textContent = '';
+  $('pfMon').textContent = `${prof.y}年${prof.m+1}月`;
+  $('pfDay').innerHTML = '<span style="color:var(--sub)">加载中…</span>';
   $('profileMask').classList.add('show');
+  renderProfileCal();
   try{
     const recs = await loadUserFullRecs(name);
-    const st = calcAchStats(recs);
-    $('pfTotal').textContent = st.totalDays;
-    $('pfCur').textContent   = st.curStreak;
-    $('pfMax').textContent   = st.maxStreak;
-    $('pfMonth').textContent =
-      `当月：出勤 ${st.monthWorkdays} 天 · 早到 ${st.monthEarly} 次 · 收官 ${st.monthLate} 次`;
-    $('pfTitle').textContent = streakTitle(st.maxStreak)
-      ? `最高称号：${streakTitle(st.maxStreak)}` : '最高称号：尚无（满 7 天解锁「一周笃行」）';
-    $('pfFirst').textContent = recs.length ? `首签：${recs.map(r=>r.date).sort()[0]}` : '尚无打卡记录';
+    recs.forEach(r=>{ prof.byDate[r.date]=r; });
+    prof.st = calcAchStats(recs);
+    $('pfTotal').textContent = prof.st.totalDays;
+    $('pfCur').textContent   = prof.st.curStreak;
+    $('pfMax').textContent   = prof.st.maxStreak;
+    renderProfileCal();
+    const t = todayStr();
+    if(t.startsWith(`${prof.y}-${pad2(prof.m+1)}`)) selectProfDay(t);   // 本月 → 默认聚焦今天
+    else $('pfDay').innerHTML = '<span style="color:var(--sub)">◀ ▶ 翻页，点任意日期看当天明细</span>';
   }catch(e){
-    $('pfMonth').textContent = '加载失败：' + ((e && e.message) || '');
+    $('pfDay').innerHTML = '<span style="color:#c0392b">加载失败：' + ((e&&e.message)||'') + '</span>';
   }
 }
 
@@ -1521,10 +1579,14 @@ $('btnJoinLb').onclick = async ()=>{
   rankJoinNames = await loadJoinNames();
   renderRank();
 };
-/* ===== 同事档案（点击姓名查看）===== */
+/* ===== 同事档案（点击姓名查看日历明细）===== */
 $('pfClose').onclick = ()=> $('profileMask').classList.remove('show');
+$('pfPrev').onclick = ()=>{ if(!prof) return; if(--prof.m<0){ prof.m=11; prof.y--; } renderProfileCal(); $('pfMon').textContent = `${prof.y}年${prof.m+1}月`; $('pfDay').innerHTML='<span style="color:var(--sub)">◀ ▶ 翻页，点任意日期看当天明细</span>'; };
+$('pfNext').onclick = ()=>{ if(!prof) return; if(++prof.m>11){ prof.m=0; prof.y++; } renderProfileCal(); $('pfMon').textContent = `${prof.y}年${prof.m+1}月`; $('pfDay').innerHTML='<span style="color:var(--sub)">◀ ▶ 翻页，点任意日期看当天明细</span>'; };
 // 事件委托：表格里所有 .name-link 都能点（同事今天 + 当月统计）
 document.addEventListener('click', (e)=>{
+  const d = e.target.closest('#pfCal .pfd[data-ds]');
+  if(d){ if(prof) selectProfDay(d.dataset.ds); return; }
   const a = e.target.closest('.name-link');
   if(!a || !a.dataset.name) return;
   e.preventDefault();
