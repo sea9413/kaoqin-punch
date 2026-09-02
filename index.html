@@ -132,6 +132,56 @@
   .card.hero .hero-left{flex:1;min-width:0}
   .card.hero .my-today{margin:0;flex-shrink:0}    /* 在 hero 内不居中、不带上下 margin */
   .app-footer{padding:16px 0 24px;text-align:center;font-size:12px;color:var(--sub);margin-top:10px}
+
+  /* ===== 成就系统 ===== */
+  .modal.wide{max-width:520px;max-height:86vh;display:flex;flex-direction:column}
+  .modal.wide .modal-bd{overflow:auto;margin:0 -4px;padding:0 4px}
+  .tabs{display:flex;gap:6px;margin-bottom:12px}
+  .tabs button{flex:1;font-size:13px;padding:8px 2px;min-width:0}
+  .tabs button.sel{background:var(--blue);color:#fff}
+  .style-sw{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub);margin-bottom:10px}
+  .style-sw .seg{display:flex;gap:6px}
+  .style-sw .seg button{flex:0 0 auto;min-width:0;padding:5px 12px;font-size:12px;opacity:.45}
+  .style-sw .seg button.sel{opacity:1;background:var(--blue);color:#fff}
+  .note{background:#fff8e6;border:1px solid #ffe0a3;color:#a06a00;border-radius:8px;
+        padding:8px 10px;font-size:12px;line-height:1.6;margin-bottom:10px}
+  /* 成就墙网格 */
+  .ach-group{margin-bottom:14px}
+  .ach-group h4{margin:0 0 8px;font-size:13px;color:var(--sub);font-weight:600}
+  .ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+  .ach-item{background:#f7f8fa;border:1px solid var(--line);border-radius:10px;padding:10px 4px;
+            text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .ach-item.unlocked{background:#fff;border-color:#ffd591;box-shadow:0 1px 3px rgba(250,173,20,.18)}
+  .ach-item.locked{opacity:.5;filter:grayscale(.9)}
+  .ach-item.hidden-ach{border-style:dashed}
+  .ach-icon{font-size:24px;line-height:1.2}
+  .ach-item.locked .ach-icon{opacity:.55}
+  .ach-name{font-size:12px;font-weight:600;line-height:1.3}
+  .ach-title{font-size:11px;color:var(--sub);line-height:1.3}
+  .ach-new{font-size:10px;color:#d48806}
+  /* 解锁庆祝弹窗 */
+  .unlock-hero{text-align:center;padding:6px 0 10px}
+  .unlock-hero .u-icon{font-size:52px;line-height:1.2}
+  .unlock-hero .u-badge{display:inline-block;margin-top:6px;font-size:12px;color:#a06800;
+                        background:#fff7e6;border:1px solid #ffd591;border-radius:10px;padding:2px 10px}
+  .unlock-hero .u-name{font-size:17px;font-weight:700;margin-top:8px}
+  .unlock-hero .u-title{font-size:14px;color:var(--blue);margin-top:2px}
+  .unlock-hero .u-words{font-size:13px;color:#666;line-height:1.7;margin-top:10px}
+  .unlock-dots{display:flex;justify-content:center;gap:5px;margin-top:10px}
+  .unlock-dots i{width:6px;height:6px;border-radius:50%;background:#ddd;display:block}
+  .unlock-dots i.on{background:var(--blue)}
+  /* 榜单 */
+  .lb-row{display:flex;align-items:center;gap:8px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:13px}
+  .lb-row.me{background:#f0f6ff}
+  .lb-rank{flex:0 0 26px;text-align:center;font-weight:700;color:var(--sub)}
+  .lb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lb-val{flex:0 0 auto;font-weight:600}
+  .lb-title{font-size:11px;color:var(--sub);flex:0 0 auto}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .stat-box{background:#f7f8fa;border-radius:10px;padding:10px 6px;text-align:center}
+  .stat-box .v{font-size:18px;font-weight:700;color:var(--blue)}
+  .stat-box .k{font-size:11px;color:var(--sub);margin-top:2px}
+  .empty-tip{color:var(--sub);font-size:13px;text-align:center;padding:18px 6px;line-height:1.7}
 </style>
 </head>
 <body>
@@ -156,6 +206,10 @@
     </div>
     <div class="row" style="margin-top:10px">
       <button class="ghost" id="btnSupplement">📝 补打卡</button>
+      <button class="ghost" id="btnAch">🏅 我的成就</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="ghost" id="btnRank">📊 趣味榜</button>
       <button class="ghost" id="btnRefresh">🔄 刷新</button>
     </div>
   </div>
@@ -268,17 +322,200 @@
   </div>
 </div>
 
+<!-- 成就墙：我的全部成就 + 风格切换 -->
+<div class="mask" id="achMask">
+  <div class="modal wide">
+    <h3>🏅 我的成就</h3>
+    <div class="style-sw">
+      <span>称号风格</span>
+      <div class="seg">
+        <button id="styleWenyi">文艺风</button>
+        <button id="styleHumor">幽默风</button>
+      </div>
+      <span style="margin-left:auto" id="achSummary"></span>
+    </div>
+    <div class="modal-bd" id="achBody"></div>
+    <div class="actions" style="margin-top:12px">
+      <button class="primary" id="achClose" style="flex:1">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 打卡反馈：解锁成就 / 随机语录 -->
+<div class="mask" id="unlockMask">
+  <div class="modal">
+    <div class="unlock-hero" id="unlockHero"></div>
+    <div class="unlock-dots" id="unlockDots"></div>
+    <div class="actions" style="margin-top:12px">
+      <button class="primary" id="unlockNext" style="flex:1">好的</button>
+    </div>
+  </div>
+</div>
+
+<!-- 趣味排行榜 -->
+<div class="mask" id="rankMask">
+  <div class="modal wide">
+    <h3>📊 趣味排行榜</h3>
+    <div class="note">📌 趣味排行榜仅供娱乐参考，不关联绩效、奖金、评优。休假是正常权利，不必刻意冲高连续天数。</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div class="tabs" style="flex:1;margin:0">
+        <button id="tabRef" class="sel">我的参考</button>
+        <button id="tabCur">当前连续榜</button>
+        <button id="tabBest">荣誉殿堂</button>
+      </div>
+      <button class="ghost" id="btnJoinLb" style="flex:0 0 auto">上榜设置</button>
+    </div>
+    <div class="modal-bd" id="rankBody"></div>
+    <div class="actions" style="margin-top:12px">
+      <button class="primary" id="rankClose" style="flex:1">关闭</button>
+    </div>
+  </div>
+</div>
+
 <div class="msg" id="msg"></div>
 
 <script>
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.0.0';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.0';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
 const SWITCH_PASSWORD = '6666';   // 切换身份密码：挡住随便切换的人，正规版建议放配置或用真实鉴权
+const PREFS_TABLE = 'kaoqin_prefs';   // 偏好表（称号风格 / 是否参与榜单）。不建表也能用，只是榜单不可用
+
+/* =========================================================================
+   成就系统配置
+   ========================================================================= */
+// 标准上下班时间（PRD 固定口径，仅用于文案/判定参考）
+const WORK_START = '08:30';
+const WORK_END   = '18:00';
+
+// 法定节假日：不计入工作日、不打断连续出勤
+// ⚠️ 以国务院当年公布的安排为准，放假安排变了改这个数组就行，其它逻辑不用动
+const HOLIDAYS = [
+  // 2026 年
+  '2026-01-01','2026-01-02','2026-01-03',                                        // 元旦
+  '2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20','2026-02-21','2026-02-22', // 春节
+  '2026-04-04','2026-04-05','2026-04-06',                                        // 清明
+  '2026-05-01','2026-05-02','2026-05-03','2026-05-04','2026-05-05',              // 劳动节
+  '2026-06-19','2026-06-20','2026-06-21',                                        // 端午
+  '2026-09-25','2026-09-26','2026-09-27',                                        // 中秋
+  '2026-10-01','2026-10-02','2026-10-03','2026-10-04','2026-10-05','2026-10-06','2026-10-07'  // 国庆
+];
+// 调休上班日：本来是周末但要上班，填进来就算工作日
+const EXTRA_WORKDAYS = [];
+
+// 打卡随机语录池（没有新成就解锁时，挑一句作为打卡反馈）
+const QUOTES = {
+  common:['不必时刻紧绷，稳定的状态就是最好的成长',
+          '认真工作，好好生活，双向奔赴才是圆满',
+          '每一次如约打卡，都是对生活的温柔坚守'],
+  early: ['揽清晨微光，赴一日山海',
+          '提前出发的温柔，胜过匆匆忙忙的奔赴'],
+  late:  ['落日收忙，烟火归心，今日辛劳皆有回响',
+          '认真收尾当下，轻松奔赴生活'],
+  night: ['夜色已深，放下忙碌，好好偏爱自己',
+          '熬夜只是偶然，好好休息才是常态']
+};
+
+/* 全量成就定义（22 项）
+   字段：id / group 分组 / name 成就名 / icon / badge 徽章名
+        wenyi 文艺风称号 / humor 幽默风称号 / words 解锁话术
+        test(st) 判定函数 / repeat 月度可重复 / hidden 隐藏成就
+   判定口径（PRD）：
+     - 工作日当日有任意一次打卡 = 有效出勤（work 和 rest 都算）
+     - 补卡只算有效出勤，不参与早到/收官/深夜/卡点判定
+     - 迟到早退不影响任何成就；徽章一旦解锁永不回收 */
+const ACHIEVEMENTS = [
+  // ===== 里程碑（终身仅 1 次）=====
+  {id:'first_punch', group:'milestone', name:'报到新人', icon:'🌱', badge:'萌新报到徽章',
+   wenyi:'新程启幕', humor:'职场新人报到',
+   words:'欢迎加入，第一签完成！新的旅程正式开启✨', test:s=>s.totalDays>=1},
+  {id:'first_early', group:'milestone', name:'早到初见', icon:'🌅', badge:'晨光初遇徽章',
+   wenyi:'朝露先行', humor:'早起特种兵',
+   words:'迎着晨光出发，每一份提前奔赴都值得温柔以待', test:s=>s.everEarly},
+  {id:'first_late', group:'milestone', name:'收官初见', icon:'🌇', badge:'暮色初收徽章',
+   wenyi:'晚风辞岗', humor:'延时打工人',
+   words:'落日伴归途，认真收尾今日所有忙碌', test:s=>s.everLate},
+  {id:'first_full_month', group:'milestone', name:'首月满勤', icon:'🌕', badge:'初月圆满徽章',
+   wenyi:'满月如初', humor:'全勤小白王者',
+   words:'从零开始的坚持，是最珍贵的职场初心', test:s=>s.firstMonthFull},
+
+  // ===== 连续出勤（请假/休息不中断）=====
+  {id:'streak7', group:'streak', name:'一周笃行', icon:'📅', badge:'周行不怠徽章',
+   wenyi:'七日持恒', humor:'续航小能手',
+   words:'一周朝夕坚守，稳定的节奏，便是最好的成长', test:s=>s.maxStreak>=7},
+  {id:'streak15', group:'streak', name:'半月恒心', icon:'🕯️', badge:'微光持守徽章',
+   wenyi:'半程微光', humor:'状态在线选手',
+   words:'半月日复一日，平凡的坚守，自带微光', test:s=>s.maxStreak>=15},
+  {id:'streak30', group:'streak', name:'整月赓续', icon:'🌙', badge:'月恒勋章',
+   wenyi:'月守初心', humor:'在岗常青树',
+   words:'一月深耕不辍，自律藏在每一次如约奔赴里', test:s=>s.maxStreak>=30},
+  {id:'streak66', group:'streak', name:'季度笃行', icon:'🏔️', badge:'笃行致远徽章',
+   wenyi:'久久笃行', humor:'职场钉子户',
+   words:'长久沉淀，时光不负每一份稳稳的坚持', test:s=>s.maxStreak>=66},
+
+  // ===== 月度循环（每月可重复解锁）=====
+  {id:'mon15', group:'monthly', name:'月度在岗', icon:'📆', badge:'月度在岗徽章', repeat:true,
+   wenyi:'逐月躬行', humor:'在岗打工人',
+   words:'认真奔赴大半时光，踏实前行，岁岁如常', test:s=>s.monthWorkdays>=15},
+  {id:'mon20', group:'monthly', name:'月度靠谱星', icon:'⭐', badge:'靠谱之星徽章', repeat:true,
+   wenyi:'温良自持', humor:'职场靠谱人',
+   words:'全程在线的稳定，是最动人的职场素养', test:s=>s.monthWorkdays>=20},
+  {id:'monFull', group:'monthly', name:'月度满勤星', icon:'🏅', badge:'满月勤勋章', repeat:true,
+   wenyi:'月满无缺', humor:'满勤卷王',
+   words:'本月圆满收官，每一次奔赴都不负时光', test:s=>s.monthFull},
+  {id:'monEarly8', group:'monthly', name:'晨光使者', icon:'🌄', badge:'晨光使者徽章', repeat:true,
+   wenyi:'揽晨而行', humor:'早起积极分子',
+   words:'你接住了清晨的温柔，也接住了生活的底气', test:s=>s.monthEarly>=8},
+  {id:'monLate8', group:'monthly', name:'暮色归人', icon:'🌆', badge:'暮色收官徽章', repeat:true,
+   wenyi:'伴暮而归', humor:'落日坚守者',
+   words:'以暮色收尾忙碌，认真对待每一个工作日', test:s=>s.monthLate>=8},
+
+  // ===== 生涯累计（永久解锁）=====
+  {id:'total100', group:'career', name:'百次耕耘', icon:'💯', badge:'百次耕耘徽章',
+   wenyi:'百朝躬耕', humor:'百日老员工',
+   words:'百次朝来暮往，点滴耕耘，皆为成长', test:s=>s.totalDays>=100},
+  {id:'total500', group:'career', name:'五百砥砺', icon:'🔰', badge:'五百砥砺徽章',
+   wenyi:'五载砺行', humor:'职场老兵',
+   words:'五百次奔赴，岁月沉淀，不负初心', test:s=>s.totalDays>=500},
+  {id:'total1000', group:'career', name:'千次奔赴', icon:'🏆', badge:'千次奔赴勋章',
+   wenyi:'千程逐光', humor:'资深打工人',
+   words:'千日坚守，与公司并肩，共赴山海', test:s=>s.totalDays>=1000},
+  {id:'total2000', group:'career', name:'两千耕耘', icon:'🎖️', badge:'时光同行徽章',
+   wenyi:'岁月偕行', humor:'元老级选手',
+   words:'朝夕相伴两千日夜，时光见证所有坚守与热爱', test:s=>s.totalDays>=2000},
+  {id:'total5000', group:'career', name:'万程同行', icon:'👑', badge:'万程纪念金章',
+   wenyi:'万程归心', humor:'职场活化石',
+   words:'长路漫漫，万程与共，致敬长久的陪伴与坚守', test:s=>s.totalDays>=5000},
+
+  // ===== 趣味彩蛋 =====
+  {id:'rush', group:'fun', name:'追风一刻', icon:'⚡', badge:'极限追风徽章',
+   wenyi:'寸时奔赴', humor:'卡点战神',
+   words:'惊险卡点成功！下次留足缓冲，从容奔赴每一天', test:s=>s.everRush},
+  {id:'mondayMaster', group:'fun', name:'周一征服者', icon:'📌', badge:'周一无畏徽章', repeat:true,
+   wenyi:'新周启序', humor:'周一不emo选手',
+   words:'战胜周一综合症，以饱满状态开启全新一周', test:s=>s.monthMondayAll},
+  {id:'fridayMaster', group:'fun', name:'周五守望者', icon:'🎉', badge:'周五欢愉徽章', repeat:true,
+   wenyi:'暮周安然', humor:'周五盼星人',
+   words:'安稳收官本周，快乐周末如期而至！', test:s=>s.monthFridayAll},
+
+  // ===== 隐藏限定（未解锁不展示）=====
+  {id:'nightStar', group:'hidden', name:'夜半归星', icon:'🌌', badge:'暗星磨砂隐藏徽章', hidden:true,
+   wenyi:'星夜独行', humor:'熬夜尾款人',
+   words:'夜色深沉，辛苦了！工作有度，睡眠无价，愿你今夜安枕，来日从容✨', test:s=>s.everNight}
+];
+
+const ACH_GROUPS = [
+  {k:'milestone', n:'里程碑'},
+  {k:'streak',    n:'连续出勤'},
+  {k:'monthly',   n:'月度挑战'},
+  {k:'career',    n:'生涯累计'},
+  {k:'fun',       n:'趣味彩蛋'},
+  {k:'hidden',    n:'隐藏成就'}
+];
 
 /* =========================================================================
    全局变量
@@ -377,7 +614,9 @@ async function changeNameTo(newName, migrate){
     }
   }
   const now=new Date(); VIEW_Y=now.getFullYear(); VIEW_M=now.getMonth();
-  try{ await loadAll(); await renderAll(); }catch(e){ showRuntimeError(e); }
+  achStats = null; newUnlockedIds = new Set();   // 换人了，成就要按新身份重算
+  try{ await loadAll(); await renderAll(); await syncAchievementsSilent(); }
+  catch(e){ showRuntimeError(e); }
   return true;
 }
 
@@ -529,6 +768,368 @@ async function renderAll(){
 }
 
 /* =========================================================================
+   成就系统：统计计算 + 成就墙 + 打卡反馈 + 趣味榜
+   ========================================================================= */
+let myAllRecs = [];        // 我的全量打卡记录（成就统计用）
+let achStats  = null;      // 我的成就统计结果
+let myPrefs   = {style:'wenyi', join:false, tableOk:false};   // 偏好（风格 / 是否上榜）
+let rankAllRecs = [];      // 全员全量记录（榜单用）
+let rankJoinNames = null;  // 愿意上榜的人名单；null = 偏好表还没建
+let newUnlockedIds = new Set();   // 本次新解锁（成就墙打 NEW 标记用）
+
+/* ---------- 基础判定 ---------- */
+// 打卡时刻（本地 HH:MM）。created_at 是 timestamptz，new Date() 会转成本地时区
+function punchHM(rec){
+  if(!rec || !rec.created_at) return null;
+  const d = new Date(rec.created_at);
+  if(isNaN(d.getTime())) return null;
+  return pad2(d.getHours())+':'+pad2(d.getMinutes());
+}
+// 工作日：周一~周五，且不是法定节假日；调休上班日单独加回来
+function isWorkday(ds){
+  if(HOLIDAYS.indexOf(ds) >= 0) return false;
+  if(EXTRA_WORKDAYS.indexOf(ds) >= 0) return true;
+  const wd = new Date(ds+'T00:00:00').getDay();
+  return wd >= 1 && wd <= 5;
+}
+function monthKey(){ const t = new Date(); return t.getFullYear()+'-'+pad2(t.getMonth()+1); }
+function styleOf(){ return localStorage.getItem('kq_style') || 'wenyi'; }
+function setStyle(v){ localStorage.setItem('kq_style', v); }
+function titleOf(a){ return styleOf()==='humor' ? a.humor : a.wenyi; }
+// 已弹过窗的成就记在 localStorage；月度成就按「id@YYYY-MM」记，所以每月能再弹一次
+function notifiedKey(a){ return a.repeat ? (a.id+'@'+monthKey()) : a.id; }
+function loadNotified(){
+  try{ return JSON.parse(localStorage.getItem('kq_ach_notified') || '{}'); }catch(e){ return {}; }
+}
+function saveNotified(o){ localStorage.setItem('kq_ach_notified', JSON.stringify(o)); }
+
+/* ---------- 统计核心 ----------
+   口径：工作日当日有任意一次打卡 = 有效出勤（上班/休息都算）
+        补卡只算有效出勤，不参与早到/收官/深夜/卡点判定
+        周末与法定节假日不参与计算，也不打断连续 */
+function calcAchStats(recs){
+  const st = {
+    totalDays:0, maxStreak:0, curStreak:0,
+    everEarly:false, everLate:false, everRush:false, everNight:false,
+    firstMonthFull:false,
+    monthWorkdays:0, monthFull:false, monthEarly:0, monthLate:0,
+    monthMondayAll:false, monthFridayAll:false
+  };
+  const byDate = {};
+  (recs||[]).forEach(r=>{ byDate[r.date] = r; });
+  const dates = Object.keys(byDate).sort();
+  if(dates.length === 0) return st;
+
+  // 1) 生涯累计 + 时刻类彩蛋
+  dates.forEach(ds=>{
+    if(!isWorkday(ds)) return;
+    st.totalDays++;
+    const r = byDate[ds];
+    if(r.is_supplement) return;                    // 补卡不参与时刻判定
+    const hm = punchHM(r);
+    if(!hm) return;
+    if(hm <= '07:59') st.everEarly = true;
+    if(hm >= WORK_END) st.everLate  = true;
+    if(hm >= '08:25' && hm <= '08:30') st.everRush  = true;
+    if(hm >= '23:50' && hm <= '23:59') st.everNight = true;
+  });
+
+  // 2) 连续出勤：从入职日遍历到今天；今天还没打卡不算断（当天没过完）
+  const today = todayStr();
+  const d = new Date(dates[0]+'T00:00:00');
+  const end = new Date(today+'T00:00:00');
+  let streak = 0, max = 0;
+  while(d <= end){
+    const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+    if(isWorkday(ds)){
+      if(byDate[ds]){ streak++; if(streak > max) max = streak; }
+      else if(ds !== today){ streak = 0; }
+    }
+    d.setDate(d.getDate()+1);
+  }
+  st.maxStreak = max;
+  st.curStreak = streak;
+
+  // 3) 首月满勤：入职日到该月月底的每个工作日都有打卡（当前月只算到今天）
+  const fd = new Date(dates[0]+'T00:00:00');
+  const fy = fd.getFullYear(), fm = fd.getMonth();
+  const now = new Date();
+  const isCur = (fy === now.getFullYear() && fm === now.getMonth());
+  const fEnd = isCur ? now.getDate() : daysInMonth(fy, fm);
+  let fFull = true, fCnt = 0;
+  for(let dd = fd.getDate(); dd <= fEnd; dd++){
+    const ds = ymd(fy, fm, dd);
+    if(!isWorkday(ds)) continue;
+    fCnt++;
+    if(!byDate[ds]){ fFull = false; break; }
+  }
+  st.firstMonthFull = fFull && fCnt > 0;
+
+  // 4) 当月统计：只算到今天，未来工作日不算缺勤（否则永远拿不到全勤）
+  const y = now.getFullYear(), m = now.getMonth();
+  let wdTotal=0, wdHit=0, monT=0, monH=0, friT=0, friH=0;
+  for(let dd=1; dd <= now.getDate(); dd++){
+    const ds = ymd(y, m, dd);
+    if(!isWorkday(ds)) continue;
+    wdTotal++;
+    const r = byDate[ds];
+    if(r) wdHit++;
+    const wd = new Date(ds+'T00:00:00').getDay();
+    if(wd === 1){ monT++; if(r) monH++; }
+    if(wd === 5){ friT++; if(r) friH++; }
+    if(r && !r.is_supplement){
+      const hm = punchHM(r);
+      if(hm){
+        if(hm <= '07:59') st.monthEarly++;
+        if(hm >= WORK_END) st.monthLate++;
+      }
+    }
+  }
+  st.monthWorkdays  = wdHit;
+  st.monthFull      = wdTotal > 0 && wdHit === wdTotal;
+  st.monthMondayAll = monT > 0 && monH === monT;
+  st.monthFridayAll = friT > 0 && friH === friT;
+  return st;
+}
+
+function evalAchievements(st){
+  return ACHIEVEMENTS.filter(a=>{ try{ return !!a.test(st); }catch(e){ return false; } });
+}
+// 连续天数 -> 对应成就称号（榜单和个人面板复用）
+function streakTitle(days){
+  const order = [['streak66',66],['streak30',30],['streak15',15],['streak7',7]];
+  for(let i=0;i<order.length;i++){
+    if(days >= order[i][1]){
+      const a = ACHIEVEMENTS.find(x=>x.id === order[i][0]);
+      return a ? titleOf(a) : '';
+    }
+  }
+  return '';
+}
+
+/* ---------- 数据读写 ---------- */
+async function loadMyAllRecs(){
+  const { data, error } = await sb.from(TABLE)
+    .select('date,status,is_supplement,created_at')
+    .eq('name', MY_NAME).limit(5000);
+  if(error) throw error;
+  return data || [];
+}
+async function loadAllRecs(){
+  const { data, error } = await sb.from(TABLE)
+    .select('name,date,status,is_supplement,created_at').limit(5000);
+  if(error) throw error;
+  return data || [];
+}
+// 偏好表没建就静默降级：成就系统照常用，只有榜单不可用
+async function loadPrefs(){
+  const out = {style:styleOf(), join:false, tableOk:false};
+  try{
+    const { data, error } = await sb.from(PREFS_TABLE).select('style,join_leaderboard').eq('name', MY_NAME).limit(1);
+    if(error) return out;
+    out.tableOk = true;
+    if(data && data[0]){
+      if(data[0].style) out.style = data[0].style;
+      out.join = !!data[0].join_leaderboard;
+    }
+  }catch(e){}
+  return out;
+}
+async function savePrefs(patch){
+  try{
+    const { error } = await sb.from(PREFS_TABLE)
+      .upsert({ name:MY_NAME, updated_at:new Date().toISOString(), ...patch }, { onConflict:'name' });
+    return !error;
+  }catch(e){ return false; }
+}
+async function loadJoinNames(){
+  try{
+    const { data, error } = await sb.from(PREFS_TABLE).select('name').eq('join_leaderboard', true);
+    if(error) return null;
+    return (data||[]).map(r=>r.name);
+  }catch(e){ return null; }
+}
+
+/* ---------- 成就墙 ---------- */
+function renderAchWall(){
+  const unlocked = new Set(achStats ? evalAchievements(achStats).map(a=>a.id) : []);
+  const html = ACH_GROUPS.map(g=>{
+    // 隐藏成就：没解锁就不露脸
+    const list = ACHIEVEMENTS.filter(a=>a.group===g.k && !(a.hidden && !unlocked.has(a.id)));
+    if(list.length === 0) return '';
+    const items = list.map(a=>{
+      const on = unlocked.has(a.id);
+      const isNew = on && newUnlockedIds.has(a.id);
+      return `<div class="ach-item ${on?'unlocked':'locked'} ${a.hidden?'hidden-ach':''}">
+        <div class="ach-icon">${on ? a.icon : '🔒'}</div>
+        <div class="ach-name">${esc(a.name)}</div>
+        <div class="ach-title">${on ? esc(titleOf(a)) : '未解锁'}</div>
+        ${isNew ? '<div class="ach-new">NEW</div>' : ''}
+      </div>`;
+    }).join('');
+    return `<div class="ach-group"><h4>${g.n}</h4><div class="ach-grid">${items}</div></div>`;
+  }).join('');
+  $('achBody').innerHTML = html || `<div class="empty-tip">暂无成就数据</div>`;
+  $('achSummary').textContent = `已解锁 ${unlocked.size}/${ACHIEVEMENTS.length}`;
+  $('styleWenyi').classList.toggle('sel', styleOf() !== 'humor');
+  $('styleHumor').classList.toggle('sel', styleOf() === 'humor');
+}
+
+/* ---------- 打卡反馈：新成就 / 随机语录 ---------- */
+let unlockQueue = [], unlockIdx = 0;
+function showUnlock(list){
+  unlockQueue = list.slice(); unlockIdx = 0;
+  renderUnlock();
+  $('unlockMask').classList.add('show');
+}
+function renderUnlock(){
+  const a = unlockQueue[unlockIdx];
+  if(!a) return;
+  $('unlockHero').innerHTML = `
+    <div class="u-icon">${a.icon}</div>
+    <div class="u-badge">${esc(a.badge)}</div>
+    <div class="u-name">${esc(a.name)}</div>
+    <div class="u-title">称号 · ${esc(titleOf(a))}</div>
+    <div class="u-words">${esc(a.words)}</div>`;
+  $('unlockDots').innerHTML = unlockQueue.map((_,i)=>`<i class="${i===unlockIdx?'on':''}"></i>`).join('');
+  $('unlockNext').textContent = unlockIdx < unlockQueue.length-1
+    ? `下一个（还有 ${unlockQueue.length-1-unlockIdx} 项）` : '太棒了';
+}
+// 有新成就就庆祝，没有就挑一句语录（按本次打卡时刻选类别，补卡只用通用语录）
+function showPunchFeedback(fresh, hm, isSupp){
+  if(fresh && fresh.length){ showUnlock(fresh); return; }
+  let pool = QUOTES.common;
+  if(!isSupp && hm){
+    if(hm >= '23:00') pool = QUOTES.night;
+    else if(hm <= '07:59') pool = QUOTES.early;
+    else if(hm >= WORK_END) pool = QUOTES.late;
+  }
+  const q = pool[Math.floor(Math.random()*pool.length)];
+  unlockQueue = [];
+  $('unlockHero').innerHTML = `
+    <div class="u-icon">${isSupp ? '📝' : '✅'}</div>
+    <div class="u-name">${isSupp ? '补卡完成' : '打卡成功'}</div>
+    <div class="u-words">${esc(q)}</div>`;
+  $('unlockDots').innerHTML = '';
+  $('unlockNext').textContent = '好的';
+  $('unlockMask').classList.add('show');
+}
+
+/* ---------- 成就检查 ---------- */
+async function checkAchievements(){
+  myAllRecs = await loadMyAllRecs();
+  achStats  = calcAchStats(myAllRecs);
+  const should = evalAchievements(achStats);
+  const notified = loadNotified();
+  const fresh = should.filter(a=>!notified[notifiedKey(a)]);   // 只有没弹过的才算「新解锁」
+  should.forEach(a=>{ notified[notifiedKey(a)] = Date.now(); });
+  saveNotified(notified);
+  newUnlockedIds = new Set(fresh.map(a=>a.id));
+  return fresh;
+}
+// 进页面时静默同步：历史成就直接记为已读，避免一打开就弹一堆旧成就
+async function syncAchievementsSilent(){
+  try{
+    myAllRecs = await loadMyAllRecs();
+    achStats  = calcAchStats(myAllRecs);
+    const notified = loadNotified();
+    evalAchievements(achStats).forEach(a=>{
+      if(!notified[notifiedKey(a)]) notified[notifiedKey(a)] = Date.now();
+    });
+    saveNotified(notified);
+  }catch(e){}
+}
+
+/* ---------- 趣味榜 ----------
+   反内卷约束：默认不上榜、只展示 TOP50、无垫底展示、无部门对比、不做任何推送 */
+const PREFS_SQL = `-- 排行榜偏好表：只存「称号风格」和「是否愿意上榜」，不建也能正常打卡
+create table if not exists public.kaoqin_prefs (
+  name text primary key,
+  style text not null default 'wenyi',                  -- wenyi 文艺风 / humor 幽默风
+  join_leaderboard boolean not null default false,      -- 默认不上榜
+  updated_at timestamptz not null default now()
+);
+
+alter table public.kaoqin_prefs enable row level security;
+
+drop policy if exists "anon_select" on public.kaoqin_prefs;
+create policy "anon_select" on public.kaoqin_prefs for select to anon using (true);
+drop policy if exists "anon_insert" on public.kaoqin_prefs;
+create policy "anon_insert" on public.kaoqin_prefs for insert to anon with check (true);
+drop policy if exists "anon_update" on public.kaoqin_prefs;
+create policy "anon_update" on public.kaoqin_prefs for update to anon using (true) with check (true);
+-- 和主表一致：不开放匿名删除`;
+
+let rankTab = 'ref';   // ref 我的参考 / cur 当前连续榜 / best 荣誉殿堂
+function calcAllStreaks(allRecs){
+  const byName = {};
+  (allRecs||[]).forEach(r=>{ (byName[r.name] = byName[r.name] || {})[r.date] = r; });
+  return Object.keys(byName).map(n=>{
+    const st = calcAchStats(Object.keys(byName[n]).map(d=>byName[n][d]));
+    return {name:n, cur:st.curStreak, max:st.maxStreak, total:st.totalDays};
+  });
+}
+function renderRank(){
+  const body = $('rankBody');
+  $('tabRef').classList.toggle('sel', rankTab==='ref');
+  $('tabCur').classList.toggle('sel', rankTab==='cur');
+  $('tabBest').classList.toggle('sel', rankTab==='best');
+  const all = calcAllStreaks(rankAllRecs);
+
+  // Tab1：我的参考面板（只有自己的数据 + 团队数字参考，零排名压力）
+  if(rankTab === 'ref'){
+    const me = all.find(x=>x.name===MY_NAME);
+    const cur = me?me.cur:0, best = me?me.max:0;
+    const maxAll = all.reduce((m,x)=>Math.max(m,x.max), 0);
+    const avgAll = all.length ? Math.round(all.reduce((s,x)=>s+x.max,0)/all.length) : 0;
+    body.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v">${cur}</div><div class="k">我的当前连续</div></div>
+        <div class="stat-box"><div class="v">${best}</div><div class="k">我的历史最高</div></div>
+        <div class="stat-box"><div class="v" style="font-size:14px">${esc(streakTitle(best)||'—')}</div><div class="k">最高称号</div></div>
+      </div>
+      <div class="note" style="background:#f0f6ff;border-color:#cfe3ff;color:#3a6ea5">
+        团队参考：最高 ${maxAll} 天 · 平均 ${avgAll} 天（只有数字，不含任何人员信息）
+      </div>
+      <div class="empty-tip" style="padding:4px">这里只有你自己的数据，没有排名、没有对比压力 😊</div>`;
+    return;
+  }
+
+  // 偏好表还没建：给出 SQL，成就系统不受影响
+  if(rankJoinNames === null){
+    body.innerHTML = `<div class="empty-tip">排行榜需要一张偏好表来记录「谁愿意上榜」。<br/>
+      <span style="font-size:12px">在 Supabase 后台 SQL Editor 执行一次即可</span><br/>
+      <button class="ghost" id="copyPrefSql" style="margin-top:10px;flex:0 0 auto">复制建表 SQL</button></div>`;
+    const b = $('copyPrefSql');
+    if(b) b.onclick = ()=>{
+      navigator.clipboard.writeText(PREFS_SQL)
+        .then(()=>toast('SQL 已复制'), ()=>toast('复制失败，手动选一下'));
+    };
+    return;
+  }
+  if(!myPrefs.join){
+    body.innerHTML = `<div class="empty-tip">你已关闭上榜权限，不参与公开展示<br/>
+      <span style="font-size:12px">想上榜单，点右上角「上榜设置」开启，随时可关</span></div>`;
+    return;
+  }
+  const joinSet = new Set(rankJoinNames || []);
+  const list = all.filter(x=>joinSet.has(x.name));
+  const key = rankTab === 'cur' ? 'cur' : 'max';
+  const sorted = list.slice().sort((a,b)=>b[key]-a[key]).slice(0, 50);   // 只展示 TOP50
+  if(sorted.length === 0){
+    body.innerHTML = `<div class="empty-tip">还没有人上榜</div>`;
+    return;
+  }
+  body.innerHTML = sorted.map((x,i)=>`
+    <div class="lb-row ${x.name===MY_NAME?'me':''}">
+      <div class="lb-rank">${i<3 ? ['🥇','🥈','🥉'][i] : (i+1)}</div>
+      <div class="lb-name">${esc(x.name)}${x.name===MY_NAME?' ·我':''}</div>
+      <div class="lb-title">${esc(streakTitle(x[key])||'')}</div>
+      <div class="lb-val">${x[key]} 天</div>
+    </div>`).join('');
+}
+
+/* =========================================================================
    打卡 / 补打卡（核心：同一天覆盖）
    ========================================================================= */
 async function punch(status, isSupplement){
@@ -546,9 +1147,16 @@ async function punch(status, isSupplement){
     else toast('保存失败：'+(error.message||''));
     return;
   }
-  toast(isSupplement ? '补卡成功' : '已记录');
   await loadAll();
   await renderAll();
+  // 打卡反馈：有新解锁的成就就庆祝，没有就给一句随机语录
+  try{
+    const fresh = await checkAchievements();
+    const tRec = (myAllRecs||[]).find(r=>r.date===date) || null;
+    showPunchFeedback(fresh, punchHM(tRec), isSupplement);
+  }catch(e){
+    toast(isSupplement ? '补卡成功' : '已记录');   // 成就算不出来，至少给个基础反馈
+  }
 }
 
 /* =========================================================================
@@ -699,7 +1307,10 @@ async function boot(){
     try{ await refreshNameList(); }catch(e){}   // 先拉一次名单，首次选名字时下拉才有建议可选
     showNameModal();
   }else{
-    try{ await loadAll(); await renderAll(); }
+    try{
+      await loadAll(); await renderAll();
+      syncAchievementsSilent();   // 后台静默同步成就，不阻塞首屏
+    }
     catch(e){ showRuntimeError(e); }
   }
 }
@@ -730,7 +1341,69 @@ $('btnWork').onclick = ()=>punchToday('work');
 $('btnRest').onclick = ()=>punchToday('rest');
 $('confirmCancel').onclick = ()=> closeConfirm(false);
 $('confirmOk').onclick = ()=> closeConfirm(true);
-$('btnRefresh').onclick = async ()=>{ try{ await loadAll(); await renderAll(); toast('已刷新'); }catch(e){ showRuntimeError(e);} };
+$('btnRefresh').onclick = async ()=>{ try{ await loadAll(); await renderAll(); syncAchievementsSilent(); toast('已刷新'); }catch(e){ showRuntimeError(e);} };
+
+/* ===== 成就墙 ===== */
+$('btnAch').onclick = async ()=>{
+  $('achMask').classList.add('show');
+  $('achBody').innerHTML = `<div class="empty-tip">正在计算成就…</div>`;
+  try{
+    if(!achStats){ myAllRecs = await loadMyAllRecs(); achStats = calcAchStats(myAllRecs); }
+  }catch(e){}
+  renderAchWall();
+};
+$('achClose').onclick = ()=> $('achMask').classList.remove('show');
+$('styleWenyi').onclick = ()=>{ setStyle('wenyi'); renderAchWall(); savePrefs({style:'wenyi'}); };
+$('styleHumor').onclick = ()=>{ setStyle('humor'); renderAchWall(); savePrefs({style:'humor'}); };
+
+/* ===== 打卡反馈弹窗：多个成就时逐个翻 ===== */
+$('unlockNext').onclick = ()=>{
+  if(unlockIdx < unlockQueue.length-1){ unlockIdx++; renderUnlock(); }
+  else $('unlockMask').classList.remove('show');
+};
+
+/* ===== 趣味榜 ===== */
+$('btnRank').onclick = async ()=>{
+  rankTab = 'ref';
+  $('rankMask').classList.add('show');
+  $('rankBody').innerHTML = `<div class="empty-tip">正在加载…</div>`;
+  try{
+    myPrefs = await loadPrefs();
+    if(myPrefs.style && myPrefs.style !== styleOf()) setStyle(myPrefs.style);
+    rankAllRecs   = await loadAllRecs();
+    rankJoinNames = await loadJoinNames();
+  }catch(e){}
+  renderRank();
+};
+$('rankClose').onclick = ()=> $('rankMask').classList.remove('show');
+$('tabRef').onclick  = ()=>{ rankTab='ref';  renderRank(); };
+$('tabCur').onclick  = ()=>{ rankTab='cur';  renderRank(); };
+$('tabBest').onclick = ()=>{ rankTab='best'; renderRank(); };
+$('btnJoinLb').onclick = async ()=>{
+  if(!myPrefs.tableOk){
+    await askConfirm({
+      title:'排行榜还差一张偏好表',
+      text:'榜单需要记录「谁愿意上榜」。到 Supabase 后台 SQL Editor 执行一次建表 SQL 即可使用，<b>不影响打卡和成就</b>。',
+      okText:'知道了', showCancel:false
+    });
+    return;
+  }
+  const willJoin = !myPrefs.join;
+  const ok = await askConfirm({
+    title: willJoin ? '参与公开榜单？' : '退出公开榜单？',
+    text: willJoin
+      ? '开启后，你的名字和连续出勤天数会出现在「当前连续榜」「荣誉殿堂」中，只展示 TOP50，随时可以关掉。'
+      : '关闭后你会立刻从榜单移除，已获得的成就不受任何影响。',
+    okText: willJoin ? '参与上榜' : '退出榜单', showCancel:true
+  });
+  if(!ok) return;
+  const done = await savePrefs({ join_leaderboard:willJoin, style:styleOf() });
+  if(!done){ toast('保存失败，请重试'); return; }
+  myPrefs.join = willJoin;
+  toast(willJoin ? '已参与上榜' : '已退出榜单');
+  rankJoinNames = await loadJoinNames();
+  renderRank();
+};
 // 月份牌翻页
 $('calPrev').onclick = async ()=>{ VIEW_M--; if(VIEW_M<0){VIEW_M=11;VIEW_Y--;} await reloadMonth(); };
 $('calNext').onclick = async ()=>{ VIEW_M++; if(VIEW_M>11){VIEW_M=0;VIEW_Y++;} await reloadMonth(); };
