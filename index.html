@@ -131,6 +131,7 @@
   .card.hero{display:flex;align-items:center;gap:14px}
   .card.hero .hero-left{flex:1;min-width:0}
   .card.hero .my-today{margin:0;flex-shrink:0}    /* 在 hero 内不居中、不带上下 margin */
+  .app-footer{padding:16px 0 24px;text-align:center;font-size:12px;color:var(--sub);margin-top:10px}
 </style>
 </head>
 <body>
@@ -787,6 +788,10 @@ $('supSubmit').onclick = async ()=>{
 };
 
 boot();
+</script>
+<footer class="app-footer" id="appFooter"></footer>
+<script>
+  $('appFooter').textContent = `团队打卡 ${VER} | 开发者: sea9413`;
 </script>
 </body>
 </html>
