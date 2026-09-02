@@ -378,7 +378,7 @@
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.1.2';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.3';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
@@ -1123,7 +1123,10 @@ function renderRank(){
       <div class="note" style="background:#f0f6ff;border-color:#cfe3ff;color:#3a6ea5">
         团队参考：最高 ${maxAll} 天 · 平均 ${avgAll} 天（只有数字，不含任何人员信息）
       </div>
-      <div class="empty-tip" style="padding:4px">这里只有你自己的数据，没有排名、没有对比压力 😊</div>`;
+      <div class="empty-tip" style="padding:4px">这里只有你自己的数据，没有排名、没有对比压力 😊</div>
+      ${rankJoinNames === null
+        ? `<div class="note" style="margin-top:10px">想看团队榜单？需要先建一张偏好表，点右上角「上榜设置」里面有 SQL。</div>`
+        : ''}`;
     return;
   }
 
@@ -1413,11 +1416,22 @@ $('tabCur').onclick  = ()=>{ rankTab='cur';  renderRank(); };
 $('tabBest').onclick = ()=>{ rankTab='best'; renderRank(); };
 $('btnJoinLb').onclick = async ()=>{
   if(!myPrefs.tableOk){
-    await askConfirm({
+    // 直接把 SQL 摆出来 + 一键复制，别让人再去找
+    const p = askConfirm({
       title:'排行榜还差一张偏好表',
-      text:'榜单需要记录「谁愿意上榜」。到 Supabase 后台 SQL Editor 执行一次建表 SQL 即可使用，<b>不影响打卡和成就</b>。',
+      text:`榜单需要记录「谁愿意上榜」。到 Supabase 后台 <b>SQL Editor</b> 执行一次下面的 SQL 即可，<b>不影响打卡和成就</b>。<br/>
+        <button class="ghost" id="copyPrefSql2" style="margin-top:10px;flex:0 0 auto">复制建表 SQL</button>
+        <pre style="background:#2b2b2b;color:#eee;padding:10px;border-radius:8px;overflow:auto;
+                    font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-all;
+                    margin:8px 0 0;max-height:220px">${esc(PREFS_SQL)}</pre>`,
       okText:'知道了', showCancel:false
     });
+    const b2 = $('copyPrefSql2');
+    if(b2) b2.onclick = ()=>{
+      navigator.clipboard.writeText(PREFS_SQL)
+        .then(()=>toast('SQL 已复制'), ()=>toast('复制失败，请手动选中复制'));
+    };
+    await p;
     return;
   }
   const willJoin = !myPrefs.join;
