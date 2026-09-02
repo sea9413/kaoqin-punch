@@ -378,7 +378,7 @@
 /* =========================================================================
    配置区：把下面两个值换成你自己的 Supabase 就行
    ========================================================================= */
-const VER = 'v1.1.0';             // 页面展示的版本号，每次发版必须 bump
+const VER = 'v1.1.1';             // 页面展示的版本号，每次发版必须 bump
 const SUPABASE_URL  = 'https://hmqhkpgwngxmfolesvyp.supabase.co';   // 考勤打卡项目（独立）
 const SUPABASE_KEY  = 'sb_publishable_VtZQ1KLkARQzAUXR2iHnVA_ltIoipkb';
 const TABLE = 'kaoqin_records';   // 表名，建表 SQL 里要一致
@@ -464,7 +464,7 @@ const ACHIEVEMENTS = [
   {id:'mon20', group:'monthly', name:'月度靠谱星', icon:'⭐', badge:'靠谱之星徽章', repeat:true,
    wenyi:'温良自持', humor:'职场靠谱人',
    words:'全程在线的稳定，是最动人的职场素养', test:s=>s.monthWorkdays>=20},
-  {id:'monFull', group:'monthly', name:'月度满勤星', icon:'🏅', badge:'满月勤勋章', repeat:true,
+  {id:'monFull', group:'monthly', name:'月度满勤星', icon:'🏅', badge:'满月勤勋章',
    wenyi:'月满无缺', humor:'满勤卷王',
    words:'本月圆满收官，每一次奔赴都不负时光', test:s=>s.monthFull},
   {id:'monEarly8', group:'monthly', name:'晨光使者', icon:'🌄', badge:'晨光使者徽章', repeat:true,
@@ -865,7 +865,7 @@ function calcAchStats(recs){
   }
   st.firstMonthFull = fFull && fCnt > 0;
 
-  // 4) 当月统计：只算到今天，未来工作日不算缺勤（否则永远拿不到全勤）
+  // 4) 当月统计：只算到今天，未来工作日不算缺勤（否则满勤永远拿不到）
   const y = now.getFullYear(), m = now.getMonth();
   let wdTotal=0, wdHit=0, monT=0, monH=0, friT=0, friH=0;
   for(let dd=1; dd <= now.getDate(); dd++){
@@ -886,9 +886,29 @@ function calcAchStats(recs){
     }
   }
   st.monthWorkdays  = wdHit;
-  st.monthFull      = wdTotal > 0 && wdHit === wdTotal;
   st.monthMondayAll = monT > 0 && monH === monT;
   st.monthFridayAll = friT > 0 && friH === friT;
+  // 月度满勤：必须等月过完才算。当月一律不判（避免月初打 2 天就"满勤"）；
+  // 历史上有过任意一个月满勤 → monthFull=true（生涯式触发，不每月重复弹窗）
+  const nowKey = y*100 + m;
+  const checkedMonths = new Set();
+  let monthFull = false;
+  Object.keys(byDate).forEach(ds=>{
+    const yy = +ds.slice(0,4), mm = +ds.slice(5,7)-1;
+    const key = yy*100 + mm;
+    if(key >= nowKey || checkedMonths.has(key)) return;
+    checkedMonths.add(key);
+    const total = daysInMonth(yy, mm);
+    let allWd=0, allHit=0;
+    for(let dd=1; dd<=total; dd++){
+      const tds = ymd(yy, mm, dd);
+      if(!isWorkday(tds)) continue;
+      allWd++;
+      if(byDate[tds]) allHit++;
+    }
+    if(allWd > 0 && allHit === allWd) monthFull = true;
+  });
+  st.monthFull = monthFull;
   return st;
 }
 
