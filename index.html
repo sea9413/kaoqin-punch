@@ -139,7 +139,6 @@
   <div class="card hero">
     <div class="hero-left">
       <h1>📅 团队打卡</h1>
-      <div class="ver" id="verBar"></div>
       <div class="today" id="todayText"></div>
       <div class="me" id="meBar"></div>
     </div>
@@ -436,7 +435,6 @@ async function loadTodayData(){
    渲染
    ========================================================================= */
 function renderMe(){
-  $('verBar').textContent = `团队打卡 ${VER} | 开发者: sea9413`;
   $('meBar').innerHTML = `我是：<b>${esc(MY_NAME)}</b> · <a href="#" id="editName">修改</a> · <a href="#" id="switchBtn">切换</a>`;
   $('editName').onclick = (e)=>{ e.preventDefault(); showNameModal('edit'); };
   $('switchBtn').onclick = (e)=>{ e.preventDefault(); showSwitchModal(); };
